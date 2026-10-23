@@ -1,39 +1,42 @@
-
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Ciudad Abierta 3D</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div id="menu">
-    <h1>Ciudad Abierta 3D</h1>
-
-    <label for="playerName">Nombre del jugador</label>
-    <input id="playerName" placeholder="Tu nombre" maxlength="20">
-
-    <label for="roomCode">Código de sala</label>
-    <input id="roomCode" placeholder="Ej. ciudad123" maxlength="30">
-
-    <button id="joinBtn">Entrar a la ciudad</button>
-    <p id="status">Listo para jugar</p>
-  </div>
-
-  <div id="hud">
-    <div id="health">Vida: 100</div>
-    <div id="weapon">Arma: Pistola</div>
-    <div id="ammo">Munición: 12</div>
-    <div id="controls">
-      WASD: moverse | Shift: correr | Espacio: saltar<br>
-      Mouse: mirar | 1/2: armas | Clic: disparar<br>
-      R: recargar | º: liberar ratón | Esc: liberar ratón
+  <div id="menu" class="menu">
+    <div class="menu-card">
+      <h1>Ciudad Abierta 3D</h1>
+      <p>Entra a una sala y juega con otras personas.</p>
+      <label for="playerName">Tu nombre</label>
+      <input id="playerName" maxlength="18" placeholder="Jugador" value="Jugador" />
+      <label for="roomCode">Código de sala</label>
+      <input id="roomCode" maxlength="24" placeholder="sala1" value="sala1" />
+      <button id="joinBtn">Entrar al juego</button>
+      <p id="status" class="status">Configura Supabase en game.js para activar el multijugador.</p>
+      <small>WASD mover · Espacio saltar · Ctrl agacharse · Shift correr</small>
     </div>
-    <button id="releaseBtn">Liberar ratón (º)</button>
-    <button id="leaveBtn">Salir de la sala</button>
   </div>
 
+  <div id="hud" class="hidden">
+    <div id="scoreboard" class="scoreboard">
+      <div class="score-title">CLASIFICACIÓN</div>
+      <div class="score-head"><span>Jugador</span><span>Kills</span></div>
+      <div id="scoreRows"></div>
+    </div>
+    <div class="stats">
+      <span>Vida: <b id="health">100</b></span>
+      <span>Arma: <b id="weapon">Pistola</b></span>
+      <span>Munición: <b id="ammo">12 / 12</b></span>
+      <span>Jugadores: <b id="players">1</b></span>
+    </div>
+    <div class="crosshair">+</div>
+    <div class="help">WASD mover · Espacio saltar · Ctrl agacharse · Shift correr · Clic izq. disparar · Clic der. apuntar · 1/2 armas · R recargar · Esc liberar mouse</div>
+    <button id="leaveBtn" class="leave">Salir</button>
+  </div>
   <script type="module" src="game.js"></script>
 </body>
 </html>
