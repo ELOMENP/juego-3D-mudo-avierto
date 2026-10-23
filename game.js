@@ -3,8 +3,8 @@ import { PointerLockControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
 // PEGA aquí los datos de Supabase. Usa la URL del proyecto y la clave PUBLICABLE/anon, nunca service_role.
-const SUPABASE_URL = 'PEGA_AQUI_TU_URL';
-const SUPABASE_KEY = 'PEGA_AQUI_TU_CLAVE_PUBLICA';
+const SUPABASE_URL = 'https://vlwfntwxbzmeodutbrxd.supabase.co/rest/v1/';
+const SUPABASE_KEY = 'sb_publishable_JKRwt7biD2Y9wCQpQC9iQA_-EDPL17V';
 
 const $ = (id) => document.getElementById(id);
 const menu = $('menu'), hud = $('hud'), statusText = $('status'), joinBtn = $('joinBtn');
