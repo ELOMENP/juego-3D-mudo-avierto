@@ -7,105 +7,83 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="menu">
-    <div class="menu-panel">
+  <div id="menu" class="screen">
+    <div class="panel">
       <h1>CIUDAD ABIERTA <span>3D</span></h1>
-      <p>Explora, combate y trabaja en equipo para sobrevivir.</p>
-      <input id="playerName" maxlength="16" value="Jugador" placeholder="Tu nombre">
-      <button id="playButton">ENTRAR A LA CIUDAD</button>
-      <p id="menuError"></p>
-      <small>Multijugador · Sala pública</small>
+      <p>Explora la ciudad. Sobrevive. Consigue más kills.</p>
+      <input id="username" maxlength="18" placeholder="Escribe tu nombre" autocomplete="off">
+      <button id="playButton">ENTRAR A LA PARTIDA</button>
+      <p id="menuMessage" class="message"></p>
+      <small>WASD mover · Shift correr · C agacharse · Click disparar</small>
     </div>
   </div>
 
-  <div id="hud" class="hidden">
-    <div class="topbar">
-      <div class="brand">CIUDAD ABIERTA <span>3D</span></div>
-      <div id="playerCount">Jugadores: 1/10</div>
-      <div id="killCount">Bajas: 0</div>
-    </div>
-
-    <div class="health-panel">
-      <div class="health-label">
-        <span>VIDA</span>
-        <span id="healthText">100 / 100</span>
+  <div id="game" class="hidden">
+    <div id="hud">
+      <div class="hud-left">
+        <div class="hud-box">
+          <small>VIDA</small>
+          <strong id="healthText">100</strong>
+          <div class="bar"><div id="healthBar"></div></div>
+        </div>
+        <div class="hud-box">
+          <small>KILLS</small>
+          <strong id="killsText">0</strong>
+        </div>
+        <div class="hud-box">
+          <small>JUGADORES</small>
+          <strong id="playersText">1</strong>
+        </div>
       </div>
-      <div class="health-track">
-        <div id="healthFill"></div>
+
+      <div id="leaderboard">
+        <h3>🏆 TOP 3 · PARTIDA ACTUAL</h3>
+        <div id="leaderRows"></div>
       </div>
-      <div id="statusText">LISTO PARA COMBATIR</div>
-    </div>
 
-    <div id="crosshair">
-      <i class="top"></i>
-      <i class="bottom"></i>
-      <i class="left"></i>
-      <i class="right"></i>
-      <i class="dot"></i>
-    </div>
-
-    <div id="hitMarker">×</div>
-    <div id="notice"></div>
-
-    <div id="downScreen" class="hidden">
-      <h2>ESTÁS DERRIBADO</h2>
-      <p>Un compañero todavía puede reanimarte.</p>
-      <div class="timer-track">
-        <div id="downTimerFill"></div>
+      <div id="crosshair">+</div>
+      <div id="notice"></div>
+      <div id="pickupHint"></div>
+      <div id="downedPanel" class="hidden">
+        <h2>ESTÁS DERRIBADO</h2>
+        <p>Espera a que un compañero te reanime</p>
+        <strong id="downTimer">30</strong>
+        <p>segundos restantes</p>
       </div>
-      <h1 id="downTimer">30</h1>
-      <p id="reviveStatus">Espera a un compañero</p>
-      <p class="small-hint">Si te rematan, no podrás ser reanimado.</p>
-    </div>
 
-    <div id="eliminatedScreen" class="hidden">
-      <h2>ELIMINADO</h2>
-      <p>Presiona E para reaparecer</p>
-    </div>
+      <div id="deadPanel" class="hidden">
+        <h2>ELIMINADO</h2>
+        <p>Tus kills se reiniciaron.</p>
+        <button id="respawnButton">REAPARECER</button>
+      </div>
 
-    <div id="settingsMenu" class="hidden">
-      <div class="settings-panel">
+      <div id="settings" class="hidden">
         <h2>AJUSTES</h2>
-
-        <label for="sensitivity">
-          Sensibilidad del mouse
-          <span id="sensitivityValue">2.2</span>
+        <label>Sensibilidad
+          <input id="sensitivity" type="range" min="0.001" max="0.006" step="0.0002" value="0.002">
         </label>
-        <input id="sensitivity" type="range" min="0.5" max="5" step="0.1" value="2.2">
-
-        <label for="fovSetting">
-          Campo de visión
-          <span id="fovValue">75</span>
+        <label>Campo de visión
+          <input id="fov" type="range" min="60" max="105" value="80">
         </label>
-        <input id="fovSetting" type="range" min="60" max="110" step="1" value="75">
-
-        <label for="graphicsSetting">Calidad gráfica</label>
-        <select id="graphicsSetting">
-          <option value="low">Baja</option>
-          <option value="medium" selected>Media</option>
-          <option value="high">Alta</option>
-        </select>
-
-        <label class="check-label">
-          <input id="crosshairSetting" type="checkbox" checked>
+        <label>Calidad gráfica
+          <select id="quality">
+            <option value="high">Alta</option>
+            <option value="medium" selected>Media</option>
+            <option value="low">Baja</option>
+          </select>
+        </label>
+        <label class="check">
+          <input id="showCrosshair" type="checkbox" checked>
           Mostrar mira
         </label>
-
-        <button id="resumeButton">VOLVER AL JUEGO</button>
-        <button id="resetSettingsButton">RESTABLECER AJUSTES</button>
-        <p class="small-hint">Presiona TAB para cerrar este menú.</p>
+        <p>Presiona TAB para cerrar</p>
       </div>
-    </div>
 
-    <div class="bottom-hint">
-      <span>WASD: mover</span>
-      <span>Mouse: disparar</span>
-      <span>Click derecho: apuntar</span>
-      <span>Shift: correr</span>
-      <span>C: agacharse/deslizarse</span>
-      <span>E: reanimar o reaparecer</span>
-      <span>TAB: ajustes</span>
-      <span>Esc: liberar cursor</span>
+      <div id="controls">
+        WASD: mover · Shift: correr · C: agacharse<br>
+        Click: disparar · Click derecho: apuntar · E: revivir/recoger
+        <br>ESC: liberar el mouse · TAB: ajustes
+      </div>
     </div>
   </div>
 
