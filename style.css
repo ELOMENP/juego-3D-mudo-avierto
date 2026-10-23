@@ -1,218 +1,331 @@
 
-/* ===== ESTILO GENERAL ===== */
-* {
-    box-sizing: border-box;
+:root {
+  color-scheme: dark;
+  --green: #36e6a0;
+  --bg: #09111b;
+  --panel: rgba(12, 22, 35, 0.96);
+  --text: #f4f7fb;
+  --muted: #a9b8c9;
 }
 
+* {
+  box-sizing: border-box;
+}
+
+html,
 body {
-    margin: 0;
-    overflow: hidden;
-    font-family: Arial, Helvetica, sans-serif;
-    background: #080d18;
-    color: white;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Arial, Helvetica, sans-serif;
 }
 
 button,
 input {
-    font: inherit;
+  font: inherit;
 }
 
-/* ===== MENÚ PRINCIPAL ===== */
-#menu,
-#mainMenu,
-.menu-screen {
-    position: fixed;
-    inset: 0;
-    z-index: 100;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-    background:
-        linear-gradient(
-            110deg,
-            rgba(4, 10, 24, 0.94),
-            rgba(6, 17, 37, 0.72),
-            rgba(4, 10, 24, 0.92)
-        );
-    backdrop-filter: blur(8px);
+button {
+  cursor: pointer;
 }
 
-/* Tarjeta del menú */
-#menu .menu-card,
-#mainMenu .menu-card,
-.menu-screen .menu-card {
-    width: min(440px, 100%);
-    padding: 38px 32px;
-    text-align: center;
-    border: 1px solid rgba(63, 174, 255, 0.38);
-    border-radius: 22px;
-    background: linear-gradient(
-        145deg,
-        rgba(17, 30, 54, 0.96),
-        rgba(7, 14, 29, 0.97)
-    );
-    box-shadow:
-        0 0 35px rgba(0, 145, 255, 0.12),
-        0 20px 70px rgba(0, 0, 0, 0.55);
-    animation: menuAppear 0.65s ease both;
+[hidden] {
+  display: none !important;
 }
 
-/* ===== TÍTULO ===== */
-#menu h1,
-#mainMenu h1,
-.menu-screen h1 {
-    margin: 0 0 10px;
-    color: #f4f9ff;
-    font-size: clamp(30px, 6vw, 43px);
-    font-weight: 900;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    text-shadow: 0 0 22px rgba(0, 157, 255, 0.48);
+.menu {
+  position: absolute;
+  z-index: 5;
+  top: 50%;
+  left: 50%;
+  width: min(92%, 440px);
+  padding: 34px;
+  border: 1px solid rgba(95, 133, 165, 0.3);
+  border-radius: 20px;
+  background: var(--panel);
+  box-shadow: 0 25px 100px #0009;
+  text-align: center;
+  transform: translate(-50%, -50%);
 }
 
-#menu h1 span,
-#mainMenu h1 span,
-.menu-screen h1 span {
-    color: #39baff;
+.logo {
+  margin-bottom: 20px;
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: 5px;
 }
 
-#menu p,
-#mainMenu p,
-.menu-screen p {
-    color: #9aacc6;
-    line-height: 1.6;
+.logo span,
+.brand span {
+  color: var(--green);
 }
 
-/* ===== CAMPOS DE TEXTO ===== */
-#menu input,
-#mainMenu input,
-.menu-screen input {
-    display: block;
-    width: 100%;
-    margin: 12px 0;
-    padding: 14px 16px;
-    color: #f5f9ff;
-    background: rgba(3, 10, 23, 0.85);
-    border: 1px solid #263d5d;
-    border-radius: 10px;
-    outline: none;
-    transition: border-color 0.2s, box-shadow 0.2s;
+.eyebrow {
+  color: var(--green);
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 2px;
 }
 
-#menu input:focus,
-#mainMenu input:focus,
-.menu-screen input:focus {
-    border-color: #32baff;
-    box-shadow: 0 0 0 3px rgba(50, 186, 255, 0.13);
+.menu h1 {
+  margin: 12px 0;
+  font-size: clamp(25px, 5vw, 36px);
+  line-height: 1.1;
 }
 
-#menu input::placeholder,
-#mainMenu input::placeholder,
-.menu-screen input::placeholder {
-    color: #7285a2;
+.subtitle {
+  margin: 12px 0 28px;
+  color: var(--muted);
+  font-size: 14px;
 }
 
-/* ===== BOTONES ===== */
-#menu button,
-#mainMenu button,
-.menu-screen button {
-    width: 100%;
-    margin-top: 12px;
-    padding: 15px 18px;
-    color: white;
-    font-weight: 800;
-    letter-spacing: 0.6px;
-    border: 1px solid transparent;
-    border-radius: 10px;
-    cursor: pointer;
-    transition:
-        transform 0.2s ease,
-        box-shadow 0.2s ease,
-        background 0.2s ease;
+label {
+  display: block;
+  margin-bottom: 8px;
+  color: #dce6f0;
+  font-size: 13px;
+  text-align: left;
 }
 
-#menu button:hover,
-#mainMenu button:hover,
-.menu-screen button:hover {
-    transform: translateY(-2px);
+input {
+  width: 100%;
+  padding: 14px;
+  margin-bottom: 15px;
+  border: 1px solid #34475b;
+  border-radius: 9px;
+  outline: none;
+  background: #0a1421;
+  color: white;
 }
 
-#menu button:active,
-#mainMenu button:active,
-.menu-screen button:active {
-    transform: scale(0.98);
+input:focus {
+  border-color: var(--green);
 }
 
-/* Crear partida */
-#menu button:first-of-type,
-#mainMenu button:first-of-type,
-.menu-screen button:first-of-type {
-    background: linear-gradient(100deg, #087cf0, #23c6ff);
-    box-shadow: 0 6px 22px rgba(0, 145, 255, 0.23);
+#playButton {
+  width: 100%;
+  padding: 15px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--green);
+  color: #062116;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  transition: filter 0.2s, transform 0.2s;
 }
 
-#menu button:first-of-type:hover,
-#mainMenu button:first-of-type:hover,
-.menu-screen button:first-of-type:hover {
-    box-shadow: 0 8px 30px rgba(0, 174, 255, 0.4);
+#playButton:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
 }
 
-/* Botones secundarios */
-#menu button:not(:first-of-type),
-#mainMenu button:not(:first-of-type),
-.menu-screen button:not(:first-of-type) {
-    background: rgba(24, 42, 68, 0.9);
-    border-color: #304b6d;
+#playButton:disabled {
+  opacity: 0.6;
+  cursor: wait;
 }
 
-#menu button:not(:first-of-type):hover,
-#mainMenu button:not(:first-of-type):hover,
-.menu-screen button:not(:first-of-type):hover {
-    background: rgba(35, 65, 101, 0.95);
-    border-color: #43baff;
+.status {
+  min-height: 20px;
+  margin: 17px 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
-/* ===== ESTADO DE CONEXIÓN ===== */
-#gameNotice,
-#statusText {
-    color: #8ddaff;
-    font-size: 13px;
+.menu-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 18px;
+  border-top: 1px solid #ffffff15;
+  color: var(--muted);
+  font-size: 9px;
+  letter-spacing: 0.7px;
 }
 
-/* ===== TABLA DE JUGADORES ===== */
-#leaderboard {
-    color: white;
-    background: rgba(5, 13, 27, 0.86);
-    border: 1px solid rgba(71, 171, 255, 0.45);
-    border-radius: 12px;
-    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.3);
-    backdrop-filter: blur(10px);
+.menu-footer span:first-child {
+  color: var(--green);
 }
 
-/* ===== ANIMACIÓN ===== */
-@keyframes menuAppear {
-    from {
-        opacity: 0;
-        transform: translateY(18px) scale(0.98);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-    }
+#game {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
 }
 
-/* ===== PANTALLAS PEQUEÑAS ===== */
-@media (max-width: 480px) {
-    #menu .menu-card,
-    #mainMenu .menu-card,
-    .menu-screen .menu-card {
-        padding: 28px 20px;
-    }
+#game canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
 
-    #menu h1,
-    #mainMenu h1,
-    .menu-screen h1 {
-        font-size: 30px;
-    }
+#hud {
+  position: absolute;
+  z-index: 2;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 13px 16px;
+  border: 1px solid #ffffff20;
+  border-radius: 12px;
+  background: rgba(8, 17, 28, 0.88);
+  backdrop-filter: blur(8px);
+}
+
+.brand {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.brand strong {
+  font-size: 13px;
+  letter-spacing: 1px;
+}
+
+.brand small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.stats {
+  display: flex;
+  gap: 20px;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: center;
+}
+
+.stat small {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.stat strong {
+  font-size: 19px;
+}
+
+#health {
+  color: var(--green);
+}
+
+#score {
+  color: #ffd166;
+}
+
+.leave-button {
+  padding: 10px 13px;
+  border: 1px solid #ff637355;
+  border-radius: 7px;
+  background: #9e2636;
+  color: white;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+#crosshair {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  color: white;
+  font-size: 26px;
+  font-weight: 400;
+  text-shadow: 0 0 4px #000;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+#help {
+  position: absolute;
+  bottom: 15px;
+  left: 15px;
+  padding: 13px 16px;
+  border: 1px solid #ffffff20;
+  border-radius: 10px;
+  background: rgba(8, 17, 28, 0.86);
+  font-size: 11px;
+  line-height: 1.35;
+  pointer-events: none;
+}
+
+#help strong {
+  color: var(--green);
+  letter-spacing: 1px;
+}
+
+#help p {
+  margin: 6px 0 0;
+  color: #d7e1ec;
+}
+
+#notice {
+  position: absolute;
+  right: 15px;
+  bottom: 15px;
+  max-width: min(75%, 350px);
+  padding: 11px 14px;
+  border: 1px solid #ffffff20;
+  border-radius: 8px;
+  background: rgba(8, 17, 28, 0.9);
+  color: white;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+#lockMessage {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: #07111bd9;
+  color: white;
+  font-size: 13px;
+  transform: translate(-50%, 35px);
+  pointer-events: none;
+}
+
+@media (max-width: 560px) {
+  .menu {
+    padding: 25px 20px;
+  }
+
+  #hud {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .brand {
+    min-width: 50%;
+  }
+
+  .stats {
+    gap: 12px;
+  }
+
+  #help {
+    bottom: 10px;
+    left: 10px;
+    padding: 10px;
+  }
+
+  #notice {
+    right: 10px;
+    bottom: 10px;
+    max-width: 52%;
+  }
 }
