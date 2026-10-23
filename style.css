@@ -1,80 +1,56 @@
 
-:root {
-  color-scheme: dark;
-  --background: #101820;
-  --panel: #121e2b;
-  --green: #20bd78;
-  --green-hover: #32d68c;
-  --text: #f8fafc;
-  --muted: #b8c4d3;
-}
-
 * {
   box-sizing: border-box;
 }
 
-html,
-body {
+html, body {
+  margin: 0;
   width: 100%;
   height: 100%;
-  margin: 0;
   overflow: hidden;
-  font-family: Arial, Helvetica, sans-serif;
-  color: var(--text);
-  background: var(--background);
+  background: #101820;
+  color: white;
+  font-family: Arial, sans-serif;
 }
 
-button,
-input {
+button, input {
   font: inherit;
 }
 
 button {
-  padding: 12px 15px;
-  border: 0;
+  border: none;
   border-radius: 7px;
-  background: var(--green);
+  padding: 12px;
+  background: #20bd78;
   color: #07160f;
   font-weight: bold;
   cursor: pointer;
-  transition: filter 0.15s, transform 0.15s;
+  margin-top: 8px;
 }
 
 button:hover {
   filter: brightness(1.1);
 }
 
-button:active {
-  transform: scale(0.98);
-}
-
 button:disabled {
-  opacity: 0.55;
-  cursor: wait;
+  opacity: .6;
 }
 
 input {
   display: block;
   width: 100%;
-  margin: 7px 0 18px;
-  padding: 13px;
+  margin: 7px 0 16px;
+  padding: 12px;
+  background: #0b1420;
   border: 1px solid #43556a;
   border-radius: 7px;
-  outline: none;
-  background: #0b1420;
   color: white;
-}
-
-input:focus {
-  border-color: var(--green);
-  box-shadow: 0 0 0 2px #20bd7830;
 }
 
 label {
   display: block;
-  color: #dce5ef;
-  font-size: 14px;
   text-align: left;
+  font-size: 14px;
 }
 
 .panel {
@@ -82,70 +58,43 @@ label {
   z-index: 5;
   top: 50%;
   left: 50%;
-  width: min(92%, 430px);
-  padding: 30px;
-  border: 1px solid #34485c;
-  border-radius: 15px;
-  background: rgba(18, 30, 43, 0.98);
-  box-shadow: 0 20px 65px #0009;
-  text-align: center;
   transform: translate(-50%, -50%);
-}
-
-.logo {
-  margin-bottom: 12px;
-  font-size: 22px;
-  font-weight: 900;
-  letter-spacing: 3px;
-}
-
-.logo span,
-.hud-brand span {
-  color: var(--green);
+  width: min(92%, 420px);
+  padding: 28px;
+  text-align: center;
+  background: #172536;
+  border: 1px solid #43556a;
+  border-radius: 14px;
+  box-shadow: 0 15px 50px #0009;
 }
 
 .panel h1 {
-  margin: 0;
-  font-size: clamp(22px, 5vw, 29px);
-  letter-spacing: 0.5px;
+  font-size: 26px;
 }
 
-.subtitle {
-  margin: 12px 0 25px;
-  color: var(--muted);
-  font-size: 14px;
+.panel h1 span,
+#hud strong {
+  color: #20bd78;
 }
 
-.panel form button {
+.panel button {
   width: 100%;
-  margin-top: 7px;
 }
 
 .secondary {
-  background: #2c3c4e;
+  background: #35475b;
   color: white;
 }
 
-.status {
-  min-height: 22px;
-  margin: 18px 0 5px;
-  color: #d9e6f1;
+#menuStatus {
   font-size: 13px;
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
 
-.small {
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.5;
-}
-
 #game {
   position: fixed;
   inset: 0;
-  width: 100%;
-  height: 100%;
 }
 
 #game canvas {
@@ -162,34 +111,41 @@ label {
   right: 12px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
   padding: 12px;
-  border: 1px solid #ffffff22;
+  background: #101820e8;
+  border: 1px solid #ffffff25;
   border-radius: 10px;
-  background: #0b1420e8;
-  backdrop-filter: blur(8px);
 }
 
-.hud-brand {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.hud-brand strong {
-  font-size: 14px;
-  letter-spacing: 0.5px;
-}
-
-.hud-brand small {
-  color: #c7d3df;
+#hud p {
+  margin: 5px 0;
   font-size: 12px;
 }
 
-.small-button {
-  padding: 10px 12px;
-  font-size: 12px;
+#healthPanel {
+  width: min(220px, 30vw);
+}
+
+.healthBackground {
+  width: 100%;
+  height: 12px;
+  background: #542831;
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+#healthFill {
+  width: 100%;
+  height: 100%;
+  background: #20bd78;
+  transition: width .15s;
+}
+
+#weaponText {
+  color: #d5dfeb;
 }
 
 .danger {
@@ -197,66 +153,73 @@ label {
   color: white;
 }
 
-#help {
+#crosshair {
   position: absolute;
-  bottom: 15px;
-  left: 15px;
-  padding: 13px 16px;
-  border: 1px solid #ffffff22;
-  border-radius: 9px;
-  background: #0b1420dd;
-  font-size: 12px;
-  line-height: 1.45;
+  z-index: 2;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 26px;
+  text-shadow: 0 1px 4px black;
   pointer-events: none;
 }
 
-#help strong {
-  color: var(--green);
+#controls {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  z-index: 2;
+  padding: 12px 15px;
+  background: #101820df;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.3;
+  pointer-events: none;
 }
 
-#help p {
-  margin: 5px 0 0;
+#controls strong {
+  color: #20bd78;
+}
+
+#controls p {
+  margin: 5px 0;
 }
 
 #notice {
   position: absolute;
-  right: 15px;
-  bottom: 15px;
-  max-width: min(90%, 380px);
-  padding: 12px 15px;
-  border: 1px solid #ffffff20;
+  right: 12px;
+  bottom: 12px;
+  z-index: 2;
+  max-width: 50%;
+  padding: 12px;
+  background: #101820e8;
   border-radius: 8px;
-  background: #0b1420e8;
   font-size: 13px;
-  overflow-wrap: anywhere;
 }
 
 [hidden] {
   display: none !important;
 }
 
-@media (max-width: 560px) {
+@media (max-width: 600px) {
   .panel {
-    padding: 22px;
+    padding: 20px;
   }
 
-  #hud {
-    flex-wrap: wrap;
+  #healthPanel {
+    order: 3;
+    width: 100%;
   }
 
-  .hud-brand {
-    min-width: 100%;
-  }
-
-  #help {
-    bottom: 10px;
-    left: 10px;
-    padding: 10px;
+  #controls {
+    bottom: 8px;
+    left: 8px;
+    padding: 8px;
   }
 
   #notice {
-    right: 10px;
-    bottom: 10px;
+    right: 8px;
+    bottom: 8px;
     max-width: 55%;
   }
 }
