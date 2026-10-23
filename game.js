@@ -3,7 +3,7 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.m
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 // CONFIGURA ESTOS DOS VALORES CON LOS DE TU PROYECTO SUPABASE
-const SUPABASE_URL = "https://vlwfntwxbzmeodutbrxd.supabase.co/rest/v1/";
+const SUPABASE_URL = "https://vlwfntwxbzmeodutbrxd.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JKRwt7biD2Y9wCQpQC9iQA_-EDPL17V";
 
 const $ = id => document.getElementById(id);
