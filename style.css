@@ -1,17 +1,27 @@
 
+:root {
+  color-scheme: dark;
+  --background: #101820;
+  --panel: #121e2b;
+  --green: #20bd78;
+  --green-hover: #32d68c;
+  --text: #f8fafc;
+  --muted: #b8c4d3;
+}
+
 * {
   box-sizing: border-box;
 }
 
 html,
 body {
-  margin: 0;
   width: 100%;
   height: 100%;
+  margin: 0;
   overflow: hidden;
-  font-family: Arial, sans-serif;
-  color: white;
-  background: #101820;
+  font-family: Arial, Helvetica, sans-serif;
+  color: var(--text);
+  background: var(--background);
 }
 
 button,
@@ -20,38 +30,51 @@ input {
 }
 
 button {
-  padding: 12px 16px;
+  padding: 12px 15px;
   border: 0;
   border-radius: 7px;
-  background: #20a464;
-  color: white;
+  background: var(--green);
+  color: #07160f;
   font-weight: bold;
   cursor: pointer;
+  transition: filter 0.15s, transform 0.15s;
 }
 
 button:hover {
-  filter: brightness(1.12);
+  filter: brightness(1.1);
+}
+
+button:active {
+  transform: scale(0.98);
 }
 
 button:disabled {
-  opacity: 0.5;
+  opacity: 0.55;
   cursor: wait;
 }
 
 input {
+  display: block;
   width: 100%;
-  padding: 12px;
-  margin: 6px 0 16px;
-  border: 1px solid #64748b;
+  margin: 7px 0 18px;
+  padding: 13px;
+  border: 1px solid #43556a;
   border-radius: 7px;
+  outline: none;
+  background: #0b1420;
   color: white;
-  background: #182536;
+}
+
+input:focus {
+  border-color: var(--green);
+  box-shadow: 0 0 0 2px #20bd7830;
 }
 
 label {
   display: block;
-  text-align: left;
+  color: #dce5ef;
   font-size: 14px;
+  text-align: left;
 }
 
 .panel {
@@ -59,42 +82,70 @@ label {
   z-index: 5;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%);
-  width: min(92%, 420px);
-  padding: 28px;
-  border: 1px solid #42546b;
+  width: min(92%, 430px);
+  padding: 30px;
+  border: 1px solid #34485c;
   border-radius: 15px;
-  background: rgba(13, 23, 37, 0.97);
-  box-shadow: 0 15px 50px #0009;
+  background: rgba(18, 30, 43, 0.98);
+  box-shadow: 0 20px 65px #0009;
   text-align: center;
+  transform: translate(-50%, -50%);
+}
+
+.logo {
+  margin-bottom: 12px;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 3px;
+}
+
+.logo span,
+.hud-brand span {
+  color: var(--green);
 }
 
 .panel h1 {
-  margin: 0 0 8px;
-  font-size: 27px;
+  margin: 0;
+  font-size: clamp(22px, 5vw, 29px);
+  letter-spacing: 0.5px;
 }
 
-.panel p {
-  color: #cbd5e1;
-  line-height: 1.5;
+.subtitle {
+  margin: 12px 0 25px;
+  color: var(--muted);
+  font-size: 14px;
 }
 
-.panel button {
+.panel form button {
   width: 100%;
-  margin: 5px 0;
+  margin-top: 7px;
 }
 
 .secondary {
-  background: #334155;
+  background: #2c3c4e;
+  color: white;
+}
+
+.status {
+  min-height: 22px;
+  margin: 18px 0 5px;
+  color: #d9e6f1;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .small {
+  color: var(--muted);
   font-size: 12px;
+  line-height: 1.5;
 }
 
 #game {
   position: fixed;
   inset: 0;
+  width: 100%;
+  height: 100%;
 }
 
 #game canvas {
@@ -111,37 +162,73 @@ label {
   right: 12px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   padding: 12px;
+  border: 1px solid #ffffff22;
   border-radius: 10px;
-  background: #0b1220d9;
+  background: #0b1420e8;
+  backdrop-filter: blur(8px);
 }
 
-#hud > div:first-child {
+.hud-brand {
+  display: flex;
   flex: 1;
-  line-height: 1.6;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hud-brand strong {
+  font-size: 14px;
+  letter-spacing: 0.5px;
+}
+
+.hud-brand small {
+  color: #c7d3df;
+  font-size: 12px;
+}
+
+.small-button {
+  padding: 10px 12px;
+  font-size: 12px;
+}
+
+.danger {
+  background: #b83d4b;
+  color: white;
 }
 
 #help {
   position: absolute;
   bottom: 15px;
   left: 15px;
-  padding: 12px 16px;
-  line-height: 1.6;
+  padding: 13px 16px;
+  border: 1px solid #ffffff22;
   border-radius: 9px;
-  background: #0b1220d9;
-  font-size: 13px;
+  background: #0b1420dd;
+  font-size: 12px;
+  line-height: 1.45;
   pointer-events: none;
+}
+
+#help strong {
+  color: var(--green);
+}
+
+#help p {
+  margin: 5px 0 0;
 }
 
 #notice {
   position: absolute;
-  bottom: 15px;
   right: 15px;
+  bottom: 15px;
   max-width: min(90%, 380px);
-  padding: 12px;
+  padding: 12px 15px;
+  border: 1px solid #ffffff20;
   border-radius: 8px;
-  background: #0b1220e8;
+  background: #0b1420e8;
+  font-size: 13px;
+  overflow-wrap: anywhere;
 }
 
 [hidden] {
@@ -150,22 +237,26 @@ label {
 
 @media (max-width: 560px) {
   .panel {
-    padding: 20px;
-  }
-
-  .panel h1 {
-    font-size: 22px;
+    padding: 22px;
   }
 
   #hud {
     flex-wrap: wrap;
   }
 
-  #hud > div:first-child {
+  .hud-brand {
     min-width: 100%;
   }
 
   #help {
-    font-size: 12px;
+    bottom: 10px;
+    left: 10px;
+    padding: 10px;
+  }
+
+  #notice {
+    right: 10px;
+    bottom: 10px;
+    max-width: 55%;
   }
 }
