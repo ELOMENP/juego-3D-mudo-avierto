@@ -1,0 +1,13 @@
+CIUDAD ABIERTA 3D - COMO ABRIRLO
+
+1. Extrae todos los archivos del ZIP en una carpeta.
+2. No abras index.html con doble clic.
+3. Haz doble clic en INICIAR_JUEGO.bat.
+4. Se abrira el navegador en http://localhost:8000.
+5. Necesitas conexion a Internet para descargar Three.js.
+6. Deja abierta la ventana negra del servidor mientras juegas. Para cerrar el servidor, cierra esa ventana.
+
+Si el juego no abre:
+- Comprueba que tu navegador tenga Internet.
+- Revisa que los archivos index.html, style.css y game.js esten juntos en esta carpeta.
+- Si Windows dice que no encuentra Python, instala Python desde https://www.python.org/downloads/ y activa la opcion Add Python to PATH.
