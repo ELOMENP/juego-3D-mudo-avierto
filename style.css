@@ -3,386 +3,333 @@
 }
 
 html, body {
+  margin: 0;
   width: 100%;
   height: 100%;
-  margin: 0;
   overflow: hidden;
+  font-family: Arial, sans-serif;
+  background: #10151b;
   color: white;
-  background: #111820;
-  font-family: Arial, Helvetica, sans-serif;
-  user-select: none;
+}
+
+button, input, select {
+  font: inherit;
+}
+
+button {
+  border: 0;
+  border-radius: 7px;
+  padding: 13px 18px;
+  background: #20a56b;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #168451;
+}
+
+input, select {
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #526170;
+  background: #18232e;
+  color: white;
+}
+
+.screen {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 20;
+  background:
+    linear-gradient(#08111bd9, #08111be8),
+    radial-gradient(circle at center, #31546a, #111821);
+}
+
+.panel {
+  width: min(440px, 92vw);
+  padding: 32px;
+  border: 1px solid #536779;
+  border-radius: 15px;
+  background: #111c28ed;
+  box-shadow: 0 20px 80px #0008;
+  text-align: center;
+}
+
+.panel h1 {
+  margin-top: 0;
+  letter-spacing: 2px;
+}
+
+.panel h1 span {
+  color: #36d998;
+}
+
+.panel input, .panel button {
+  width: 100%;
+  margin: 8px 0;
+}
+
+.panel p {
+  color: #c1d0dd;
+}
+
+.panel small {
+  display: block;
+  margin-top: 15px;
+  line-height: 1.5;
+  color: #9eb0bf;
+}
+
+.message {
+  min-height: 20px;
+  color: #ff8d8d !important;
 }
 
 .hidden {
   display: none !important;
 }
 
-#menu {
+#game {
   position: fixed;
   inset: 0;
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 15px;
-  background: radial-gradient(circle, #294650, #08111a 75%);
 }
 
-.menu-panel, .settings-panel {
-  width: min(440px, 94vw);
-  padding: 30px;
-  text-align: center;
-  background: rgba(9, 19, 29, 0.96);
-  border: 1px solid #40d9ff66;
-  border-radius: 12px;
-  box-shadow: 0 18px 60px #0009;
-}
-
-h1, h2 {
-  margin-top: 0;
-}
-
-.menu-panel h1 {
-  font-size: clamp(25px, 5vw, 40px);
-  letter-spacing: 1px;
-}
-
-.menu-panel h1 span, .brand span {
-  color: #40d9ff;
-}
-
-.menu-panel p {
-  color: #bdcbd3;
-  line-height: 1.5;
-}
-
-#playerName {
-  width: 100%;
-  margin: 15px 0 12px;
-  padding: 14px;
-  border: 1px solid #405765;
-  border-radius: 5px;
-  color: white;
-  background: #172630;
-  font-size: 16px;
-}
-
-button {
-  cursor: pointer;
-}
-
-#playButton {
-  width: 100%;
-  padding: 15px;
-  border: 0;
-  border-radius: 5px;
-  background: #40d9ff;
-  color: #06141b;
-  font-weight: bold;
-}
-
-#playButton:disabled {
-  opacity: 0.6;
-}
-
-.menu-panel small {
+canvas {
   display: block;
-  margin-top: 18px;
-  color: #90a4b0;
-}
-
-#menuError {
-  color: #ff7777;
-  font-size: 13px;
 }
 
 #hud {
   position: fixed;
   inset: 0;
-  z-index: 10;
   pointer-events: none;
 }
 
-.topbar {
+.hud-left {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
+  left: 18px;
+  top: 18px;
   display: flex;
-  align-items: center;
   gap: 10px;
-  padding: 17px 22px;
-  background: linear-gradient(#0009, transparent);
 }
 
-.brand {
-  margin-right: auto;
-  font-weight: bold;
-  letter-spacing: 1px;
+.hud-box {
+  min-width: 90px;
+  padding: 11px;
+  background: #08131cce;
+  border: 1px solid #ffffff28;
+  border-radius: 8px;
 }
 
-#playerCount, #killCount {
-  padding: 8px 10px;
-  background: #0007;
-  border: 1px solid #ffffff24;
-  border-radius: 5px;
-  font-size: 12px;
-}
-
-.health-panel {
-  position: absolute;
-  left: 22px;
-  bottom: 100px;
-  width: 235px;
-  padding: 12px;
-  border-radius: 7px;
-  background: #07121bd9;
-  border: 1px solid #ffffff24;
-}
-
-.health-label {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  font-size: 12px;
-  font-weight: bold;
-}
-
-.health-track, .timer-track {
-  height: 12px;
-  overflow: hidden;
-  background: #452326;
-  border-radius: 3px;
-}
-
-#healthFill {
-  height: 100%;
-  width: 100%;
-  background: #48e58c;
-  transition: width 0.12s;
-}
-
-#statusText {
-  margin-top: 8px;
-  color: #a6dce9;
+.hud-box small {
+  display: block;
   font-size: 10px;
   letter-spacing: 1px;
+  color: #b4c6d5;
+}
+
+.hud-box strong {
+  display: block;
+  font-size: 23px;
+  margin-top: 3px;
+}
+
+.bar {
+  height: 5px;
+  margin-top: 7px;
+  background: #442929;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+#healthBar {
+  height: 100%;
+  width: 100%;
+  background: #31d58d;
+  transition: width .15s;
+}
+
+#leaderboard {
+  position: absolute;
+  right: 18px;
+  top: 18px;
+  width: 255px;
+  padding: 12px;
+  border: 1px solid #ffffff30;
+  border-radius: 9px;
+  background: #08131cdb;
+}
+
+#leaderboard h3 {
+  font-size: 13px;
+  margin: 0 0 9px;
+  color: #8df4c4;
+}
+
+.leader-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 7px 3px;
+  border-top: 1px solid #ffffff15;
+  font-size: 13px;
+}
+
+.leader-rank {
+  width: 24px;
+  font-size: 17px;
+}
+
+.leader-name {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.leader-kills {
+  font-weight: bold;
 }
 
 #crosshair {
   position: absolute;
-  top: 50%;
   left: 50%;
-  width: 24px;
-  height: 24px;
-  transform: translate(-50%, -50%);
-}
-
-#crosshair i {
-  position: absolute;
-  display: block;
-  background: white;
-  box-shadow: 0 0 3px black;
-  border-radius: 2px;
-}
-
-#crosshair .top, #crosshair .bottom {
-  left: 11px;
-  width: 2px;
-  height: 6px;
-}
-
-#crosshair .top { top: 0; }
-#crosshair .bottom { bottom: 0; }
-
-#crosshair .left, #crosshair .right {
-  top: 11px;
-  width: 6px;
-  height: 2px;
-}
-
-#crosshair .left { left: 0; }
-#crosshair .right { right: 0; }
-
-#crosshair .dot {
-  top: 10px;
-  left: 10px;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: #40d9ff;
-}
-
-#hitMarker {
-  display: none;
-  position: absolute;
   top: 50%;
-  left: 50%;
   transform: translate(-50%, -50%);
-  color: #ff5151;
-  font-size: 38px;
-  font-weight: bold;
+  font-size: 28px;
+  font-weight: 300;
+  text-shadow: 0 0 5px black;
 }
 
 #notice {
   position: absolute;
-  top: 19%;
   left: 50%;
+  top: 20%;
   transform: translateX(-50%);
   padding: 10px 16px;
-  border-radius: 5px;
-  background: #07121be8;
+  border-radius: 8px;
+  background: #07121ddd;
   font-weight: bold;
   opacity: 0;
-  transition: opacity 0.15s;
-  text-align: center;
+  transition: opacity .15s;
 }
 
-.bottom-hint {
+#notice.visible {
+  opacity: 1;
+}
+
+#pickupHint {
   position: absolute;
-  right: 16px;
-  bottom: 16px;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 5px;
-  max-width: 570px;
+  left: 50%;
+  top: 62%;
+  transform: translateX(-50%);
+  padding: 9px 12px;
+  border-radius: 7px;
+  background: #07121ddd;
 }
 
-.bottom-hint span {
-  padding: 7px 9px;
-  border-radius: 4px;
-  background: #07121bd9;
-  border: 1px solid #ffffff20;
-  font-size: 10px;
-}
-
-#downScreen, #eliminatedScreen {
+#downedPanel, #deadPanel {
   position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(360px, 90vw);
+  padding: 24px;
   text-align: center;
-  background: #18080ad9;
-  padding: 20px;
+  border: 1px solid #ff6868;
+  border-radius: 12px;
+  background: #200c0cee;
 }
 
-#downScreen h2, #eliminatedScreen h2 {
-  margin: 0 0 10px;
-  color: #ff6868;
-  font-size: clamp(28px, 5vw, 50px);
+#downedPanel strong {
+  font-size: 50px;
+  color: #ff7474;
 }
 
-#downTimer {
-  margin: 15px 0;
-  font-size: 60px;
-  color: #ffd56b;
-}
-
-.timer-track {
-  width: min(300px, 80vw);
-  height: 10px;
-  background: #522b2b;
-}
-
-#downTimerFill {
-  width: 100%;
-  height: 100%;
-  background: #ff6969;
-}
-
-#reviveStatus {
-  font-weight: bold;
-  color: #90e9ff;
-}
-
-.small-hint {
-  color: #c5d2d9;
-  font-size: 12px;
-}
-
-#settingsMenu {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 15px;
-  background: #03080edb;
+#deadPanel button {
   pointer-events: auto;
 }
 
-.settings-panel {
-  max-height: 90vh;
-  overflow-y: auto;
-  text-align: left;
+#settings {
+  pointer-events: auto;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(360px, 90vw);
+  padding: 24px;
+  border: 1px solid #ffffff35;
+  border-radius: 12px;
+  background: #101d2af5;
 }
 
-.settings-panel h2 {
-  text-align: center;
-  color: #40d9ff;
+#settings h2 {
+  margin-top: 0;
 }
 
-.settings-panel > label:not(.check-label) {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  margin: 20px 0 8px;
-  font-size: 14px;
+#settings label {
+  display: block;
+  margin: 15px 0;
+  font-size: 13px;
 }
 
-.settings-panel input[type="range"] {
+#settings label input[type="range"],
+#settings select {
+  display: block;
   width: 100%;
-  accent-color: #40d9ff;
+  margin-top: 8px;
 }
 
-.settings-panel select {
-  width: 100%;
-  padding: 10px;
-  color: white;
-  background: #172630;
-  border: 1px solid #405765;
-  border-radius: 5px;
-}
-
-.check-label {
+#settings .check {
   display: flex;
   gap: 10px;
   align-items: center;
-  margin: 20px 0;
 }
 
-.check-label input {
-  accent-color: #40d9ff;
+#settings p {
+  color: #aabac7;
+  font-size: 12px;
 }
 
-.settings-panel button {
-  width: 100%;
-  margin-top: 10px;
-  padding: 13px;
-  border: 0;
-  border-radius: 5px;
-  font-weight: bold;
+#controls {
+  position: absolute;
+  bottom: 15px;
+  left: 15px;
+  padding: 10px;
+  border-radius: 7px;
+  background: #07121cbd;
+  color: #dce8ef;
+  font-size: 11px;
+  line-height: 1.6;
 }
 
-#resumeButton {
-  background: #40d9ff;
-  color: #06141b;
-}
+@media (max-width: 650px) {
+  .hud-left {
+    top: 10px;
+    left: 10px;
+    gap: 5px;
+  }
 
-#resetSettingsButton {
-  color: white;
-  background: #344550;
-}
+  .hud-box {
+    min-width: 65px;
+    padding: 7px;
+  }
 
-@media (max-width: 600px) {
-  .topbar { padding: 10px; gap: 5px; }
-  .brand { font-size: 11px; }
-  #playerCount, #killCount { font-size: 9px; padding: 6px; }
-  .health-panel { left: 10px; bottom: 125px; width: 185px; }
-  .bottom-hint { left: 8px; right: 8px; bottom: 8px; }
-  .bottom-hint span { font-size: 9px; padding: 5px; }
+  .hud-box strong {
+    font-size: 18px;
+  }
+
+  #leaderboard {
+    top: 105px;
+    right: 10px;
+    width: 200px;
+  }
+
+  #controls {
+    max-width: 70vw;
+    font-size: 9px;
+  }
 }
