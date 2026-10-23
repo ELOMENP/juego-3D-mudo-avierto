@@ -1,337 +1,637 @@
-const errorBox = document.querySelector('#error');
-const toast = document.querySelector('#toast');
-const controlStatus = document.querySelector('#control-status');
-const fpsLabel = document.querySelector('#fps');
-let gameModuleReady = false;
 
-// Si el navegador bloquea los módulos (por ejemplo, al abrir index.html con doble clic),
-// el botón informa al usuario de cómo abrir el proyecto correctamente.
-document.querySelector('#btn-start')?.addEventListener('click', () => {
-  if (!gameModuleReady) {
-    errorBox.hidden = false;
-    errorBox.textContent = 'El juego todavía no se ha iniciado. No abras index.html con doble clic. Ejecuta INICIAR_JUEGO.bat desde esta carpeta y abre la dirección que aparece en la ventana. Si el mensaje continúa, revisa tu conexión a Internet.';
+import * as THREE from
+  "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
+
+import { createClient } from
+  "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
+/*
+  CONFIGURACIÓN:
+  Sustituye estos dos valores por los de tu proyecto Supabase.
+  No uses claves secretas ni service_role en el navegador.
+*/
+const SUPABASE_URL = "TU_URL_DE_SUPABASE";
+const SUPABASE_ANON_KEY = "TU_CLAVE_PUBLICA_DE_SUPABASE";
+
+const $ = (id) => document.getElementById(id);
+const MAX_PLAYERS = 10;
+const MOVE_SPEED = 7;
+
+const menu = $("menu");
+const game = $("game");
+const joinForm = $("joinForm");
+const joinButton = $("joinButton");
+const newRoomButton = $("newRoomButton");
+const menuStatus = $("menuStatus");
+
+let supabase = null;
+let channel = null;
+let scene = null;
+let camera = null;
+let renderer = null;
+let player = null;
+
+let joined = false;
+let playerName = "";
+let roomCode = "";
+let yaw = 0;
+let pitch = 0.25;
+let lastFrame = 0;
+let lastBroadcast = 0;
+
+const playerId = crypto.randomUUID();
+const keys = new Set();
+const remotes = new Map();
+
+const state = {
+  x: 0,
+  z: 0,
+  rotation: 0
+};
+
+function setStatus(message) {
+  menuStatus.textContent = message;
+}
+
+function randomRoomCode() {
+  return Math.random().toString(36).slice(2, 8).toUpperCase();
+}
+
+function isConfigured() {
+  return (
+    SUPABASE_URL.startsWith("https://") &&
+    !SUPABASE_URL.includes("TU_URL") &&
+    SUPABASE_ANON_KEY.length > 20 &&
+    !SUPABASE_ANON_KEY.includes("TU_CLAVE")
+  );
+}
+
+joinForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  startGame(false);
+});
+
+newRoomButton.addEventListener("click", () => {
+  startGame(true);
+});
+
+async function startGame(createRoom) {
+  if (joined) return;
+
+  playerName = $("playerName").value.trim().slice(0, 18);
+  roomCode = $("roomCode").value.trim().toUpperCase();
+
+  if (!playerName) {
+    setStatus("Escribe tu nombre antes de entrar.");
+    $("playerName").focus();
+    return;
+  }
+
+  if (createRoom || !roomCode) {
+    roomCode = randomRoomCode();
+  }
+
+  if (!/^[A-Z0-9_-]{3,20}$/.test(roomCode)) {
+    setStatus("Usa un código de sala de 3 a 20 letras o números.");
+    return;
+  }
+
+  if (!isConfigured()) {
+    setStatus(
+      "Falta configurar Supabase. Edita SUPABASE_URL y SUPABASE_ANON_KEY en game.js."
+    );
+    return;
+  }
+
+  joinButton.disabled = true;
+  newRoomButton.disabled = true;
+  setStatus("Conectando con la sala...");
+
+  try {
+    supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    channel = supabase.channel("ciudad-" + roomCode, {
+      config: {
+        broadcast: { self: false },
+        presence: { key: playerId }
+      }
+    });
+
+    channel.on("broadcast", { event: "position" }, ({ payload }) => {
+      receivePosition(payload);
+    });
+
+    channel.on("presence", { event: "sync" }, syncPlayers);
+
+    await subscribeToRoom();
+
+    createWorld();
+
+    joined = true;
+    menu.hidden = true;
+    game.hidden = false;
+    $("currentRoom").textContent = roomCode;
+    $("notice").textContent =
+      "Conectado. Haz clic en la ciudad para controlar la cámara.";
+
+    const inviteUrl = new URL(location.href);
+    inviteUrl.searchParams.set("room", roomCode);
+    history.replaceState(null, "", inviteUrl);
+
+    requestAnimationFrame(animate);
+  } catch (error) {
+    console.error("Error de conexión:", error);
+    setStatus("No se pudo iniciar: " + (error.message || "Error desconocido"));
+
+    if (channel) {
+      try {
+        await channel.unsubscribe();
+      } catch {}
+    }
+    channel = null;
+  } finally {
+    joinButton.disabled = false;
+    newRoomButton.disabled = false;
+  }
+}
+
+function subscribeToRoom() {
+  return new Promise((resolve, reject) => {
+    let finished = false;
+
+    const timeout = setTimeout(() => {
+      if (finished) return;
+      finished = true;
+      reject(new Error("La conexión tardó demasiado. Comprueba Supabase."));
+    }, 15000);
+
+    channel.subscribe(async (status) => {
+      if (status === "SUBSCRIBED" && !finished) {
+        try {
+          const entries = flattenPresence(channel.presenceState());
+
+          if (entries.length >= MAX_PLAYERS) {
+            finished = true;
+            clearTimeout(timeout);
+            await channel.unsubscribe();
+            reject(new Error("La sala está llena (10 jugadores)."));
+            return;
+          }
+
+          await channel.track({
+            id: playerId,
+            name: playerName,
+            x: state.x,
+            z: state.z,
+            rotation: state.rotation
+          });
+
+          finished = true;
+          clearTimeout(timeout);
+          resolve();
+        } catch (error) {
+          if (finished) return;
+          finished = true;
+          clearTimeout(timeout);
+          reject(error);
+        }
+      }
+
+      if (
+        (status === "CHANNEL_ERROR" || status === "TIMED_OUT") &&
+        !finished
+      ) {
+        finished = true;
+        clearTimeout(timeout);
+        reject(new Error("Supabase no pudo conectar con la sala."));
+      }
+    });
+  });
+}
+
+function flattenPresence(presenceState) {
+  return Object.values(presenceState).flat();
+}
+
+function syncPlayers() {
+  if (!channel || !scene) return;
+
+  const entries = flattenPresence(channel.presenceState());
+  const active = new Set();
+
+  for (const data of entries) {
+    if (!data.id || data.id === playerId) continue;
+    active.add(data.id);
+
+    if (!remotes.has(data.id)) {
+      addRemote({
+        id: data.id,
+        name: data.name || "Jugador",
+        x: Number(data.x) || 0,
+        z: Number(data.z) || 0,
+        rotation: Number(data.rotation) || 0
+      });
+    }
+  }
+
+  for (const [id, remote] of remotes) {
+    if (!active.has(id)) {
+      scene.remove(remote.group);
+      disposeGroup(remote.group);
+      remotes.delete(id);
+    }
+  }
+
+  $("playerCount").textContent = String(
+    Math.min(MAX_PLAYERS, new Set(entries.map(p => p.id)).size)
+  );
+}
+
+function receivePosition(data) {
+  if (!data || data.id === playerId) return;
+  if (!Number.isFinite(data.x) || !Number.isFinite(data.z)) return;
+
+  let remote = remotes.get(data.id);
+
+  if (!remote) {
+    addRemote(data);
+    remote = remotes.get(data.id);
+  }
+
+  if (!remote) return;
+
+  remote.targetX = THREE.MathUtils.clamp(data.x, -120, 120);
+  remote.targetZ = THREE.MathUtils.clamp(data.z, -120, 120);
+  remote.targetRotation = Number(data.rotation) || 0;
+}
+
+function createWorld() {
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x8bc7ed);
+  scene.fog = new THREE.Fog(0x8bc7ed, 90, 260);
+
+  camera = new THREE.PerspectiveCamera(
+    70,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    500
+  );
+
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  game.insertBefore(renderer.domElement, $("hud"));
+
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x607060, 2));
+
+  const sunlight = new THREE.DirectionalLight(0xffffff, 2);
+  sunlight.position.set(40, 70, 30);
+  sunlight.castShadow = true;
+  scene.add(sunlight);
+
+  const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(260, 260),
+    new THREE.MeshStandardMaterial({ color: 0x4d844b })
+  );
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  createRoads();
+  createBuildings();
+
+  player = createCharacter(0x1fc8a0, playerName);
+  player.position.set(state.x, 0, state.z);
+  scene.add(player);
+
+  window.addEventListener("resize", resize);
+  window.addEventListener("keydown", onKeyDown);
+  window.addEventListener("keyup", onKeyUp);
+
+  renderer.domElement.addEventListener("click", () => {
+    if (document.pointerLockElement !== renderer.domElement) {
+      renderer.domElement.requestPointerLock?.();
+    }
+  });
+
+  document.addEventListener("mousemove", onMouseMove);
+}
+
+function createRoads() {
+  for (let n = -100; n <= 100; n += 40) {
+    addBox(12, 0.08, 260, 0x343a40, n, 0.06, 0);
+    addBox(260, 0.08, 12, 0x343a40, 0, 0.06, n);
+
+    addBox(0.08, 0.02, 260, 0xe8dfb4, n, 0.11, 0);
+    addBox(260, 0.02, 0.08, 0xe8dfb4, 0, 0.11, n);
+  }
+}
+
+function createBuildings() {
+  for (let x = -90; x <= 90; x += 20) {
+    for (let z = -90; z <= 90; z += 20) {
+      if (Math.abs(x % 40) < 8 || Math.abs(z % 40) < 8) continue;
+
+      const width = 7 + Math.random() * 4;
+      const depth = 7 + Math.random() * 4;
+      const height = 5 + Math.random() * 24;
+
+      const color = new THREE.Color().setHSL(
+        0.55 + Math.random() * 0.08,
+        0.12 + Math.random() * 0.18,
+        0.35 + Math.random() * 0.25
+      );
+
+      const building = new THREE.Mesh(
+        new THREE.BoxGeometry(width, height, depth),
+        new THREE.MeshStandardMaterial({ color })
+      );
+
+      building.position.set(
+        x + (Math.random() - 0.5) * 5,
+        height / 2,
+        z + (Math.random() - 0.5) * 5
+      );
+
+      building.castShadow = true;
+      building.receiveShadow = true;
+      scene.add(building);
+    }
+  }
+}
+
+function addBox(sx, sy, sz, color, x, y, z) {
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(sx, sy, sz),
+    new THREE.MeshStandardMaterial({ color })
+  );
+  mesh.position.set(x, y, z);
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+}
+
+function createCharacter(color, name) {
+  const group = new THREE.Group();
+
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(0.8, 1.3, 0.45),
+    new THREE.MeshStandardMaterial({ color })
+  );
+  body.position.y = 1.15;
+  body.castShadow = true;
+  group.add(body);
+
+  const head = new THREE.Mesh(
+    new THREE.SphereGeometry(0.32, 16, 12),
+    new THREE.MeshStandardMaterial({ color: 0xe8bd94 })
+  );
+  head.position.y = 2.05;
+  head.castShadow = true;
+  group.add(head);
+
+  const labelCanvas = document.createElement("canvas");
+  labelCanvas.width = 512;
+  labelCanvas.height = 128;
+
+  const ctx = labelCanvas.getContext("2d");
+  ctx.font = "bold 44px Arial";
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#ffffff";
+  ctx.strokeStyle = "#111827";
+  ctx.lineWidth = 6;
+  ctx.strokeText(String(name).slice(0, 18), 256, 78);
+  ctx.fillText(String(name).slice(0, 18), 256, 78);
+
+  const texture = new THREE.CanvasTexture(labelCanvas);
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: texture, transparent: true })
+  );
+
+  sprite.position.y = 2.75;
+  sprite.scale.set(2.6, 0.65, 1);
+  group.add(sprite);
+
+  return group;
+}
+
+function addRemote(data) {
+  if (!scene || !data.id || data.id === playerId) return;
+
+  const group = createCharacter(0xf0a33b, data.name || "Jugador");
+  group.position.set(data.x || 0, 0, data.z || 0);
+  scene.add(group);
+
+  remotes.set(data.id, {
+    group,
+    targetX: data.x || 0,
+    targetZ: data.z || 0,
+    targetRotation: data.rotation || 0
+  });
+}
+
+function disposeGroup(group) {
+  group.traverse((object) => {
+    if (!object.isMesh && !object.isSprite) return;
+
+    object.geometry?.dispose();
+
+    const materials = Array.isArray(object.material)
+      ? object.material
+      : [object.material];
+
+    for (const material of materials) {
+      if (material.map) material.map.dispose();
+      material.dispose();
+    }
+  });
+}
+
+function onKeyDown(event) {
+  const key = event.key.toLowerCase();
+
+  if (
+    ["w", "a", "s", "d", "arrowup", "arrowdown",
+     "arrowleft", "arrowright", " "].includes(key)
+  ) {
+    event.preventDefault();
+  }
+
+  keys.add(key);
+}
+
+function onKeyUp(event) {
+  keys.delete(event.key.toLowerCase());
+}
+
+function onMouseMove(event) {
+  if (document.pointerLockElement !== renderer?.domElement) return;
+
+  yaw -= event.movementX * 0.0025;
+  pitch = THREE.MathUtils.clamp(
+    pitch + event.movementY * 0.0015,
+    -0.05,
+    0.8
+  );
+}
+
+function resize() {
+  if (!camera || !renderer) return;
+
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function animate(now = 0) {
+  if (!joined) return;
+
+  requestAnimationFrame(animate);
+
+  const delta = Math.min((now - lastFrame) / 1000 || 0, 0.05);
+  lastFrame = now;
+
+  const runMultiplier = keys.has("shift") ? 1.7 : 1;
+  const velocity = MOVE_SPEED * runMultiplier * delta;
+
+  let forward = 0;
+  let sideways = 0;
+
+  if (keys.has("w") || keys.has("arrowup")) forward++;
+  if (keys.has("s") || keys.has("arrowdown")) forward--;
+  if (keys.has("a") || keys.has("arrowleft")) sideways--;
+  if (keys.has("d") || keys.has("arrowright")) sideways++;
+
+  const length = Math.hypot(forward, sideways) || 1;
+  forward /= length;
+  sideways /= length;
+
+  const sin = Math.sin(yaw);
+  const cos = Math.cos(yaw);
+
+  state.x += (sideways * cos + forward * sin) * velocity;
+  state.z += (sideways * sin - forward * cos) * velocity;
+
+  state.x = THREE.MathUtils.clamp(state.x, -120, 120);
+  state.z = THREE.MathUtils.clamp(state.z, -120, 120);
+  state.rotation = yaw;
+
+  player.position.set(state.x, 0, state.z);
+  player.rotation.y = yaw;
+
+  const distance = 7;
+  const target = new THREE.Vector3(
+    state.x - Math.sin(yaw) * distance,
+    4 + pitch * 2,
+    state.z + Math.cos(yaw) * distance
+  );
+
+  camera.position.lerp(target, 0.12);
+  camera.lookAt(state.x, 1.4, state.z);
+
+  for (const remote of remotes.values()) {
+    remote.group.position.x = THREE.MathUtils.lerp(
+      remote.group.position.x,
+      remote.targetX,
+      0.2
+    );
+
+    remote.group.position.z = THREE.MathUtils.lerp(
+      remote.group.position.z,
+      remote.targetZ,
+      0.2
+    );
+
+    remote.group.rotation.y = remote.targetRotation;
+  }
+
+  if (now - lastBroadcast > 100 && channel) {
+    lastBroadcast = now;
+
+    channel.send({
+      type: "broadcast",
+      event: "position",
+      payload: {
+        id: playerId,
+        name: playerName,
+        x: state.x,
+        z: state.z,
+        rotation: yaw
+      }
+    }).catch((error) => console.error("Error de sincronización:", error));
+  }
+
+  renderer.render(scene, camera);
+}
+
+$("copyRoomButton").addEventListener("click", async () => {
+  const invite = new URL(location.href);
+  invite.searchParams.set("room", roomCode);
+
+  try {
+    await navigator.clipboard.writeText(invite.toString());
+    $("notice").textContent = "¡Enlace copiado! Envíalo a tus amigos.";
+  } catch {
+    $("notice").textContent = "Comparte este enlace: " + invite.toString();
   }
 });
 
-// Importación dinámica: si falla el CDN, mostramos el error en pantalla
-// e intentamos una segunda dirección en lugar de dejar la carga infinita.
-loadThree()
-  .then((THREE) => {
-    try { startGame(THREE); } catch (err) { showError(err); }
-  })
-  .catch((err) => showError(err));
+$("leaveButton").addEventListener("click", leaveGame);
 
-async function loadThree() {
-  const urls = [
-    'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js',
-    'https://unpkg.com/three@0.170.0/build/three.module.js'
-  ];
-  let lastError;
-  for (const url of urls) {
+async function leaveGame() {
+  joined = false;
+  keys.clear();
+
+  document.exitPointerLock?.();
+  window.removeEventListener("resize", resize);
+  window.removeEventListener("keydown", onKeyDown);
+  window.removeEventListener("keyup", onKeyUp);
+  document.removeEventListener("mousemove", onMouseMove);
+
+  if (channel) {
     try {
-      const mod = await import(url);
-      return mod;
-    } catch (err) {
-      lastError = err;
-      console.warn('No se pudo cargar Three.js desde:', url, err);
-    }
-  }
-  throw new Error('No se pudo descargar Three.js desde ninguno de los servidores. Revisa tu conexión a Internet, VPN o bloqueo del navegador. Error: ' + (lastError?.message || lastError));
-}
-
-function showError(err) {
-  console.error(err);
-  errorBox.hidden = false;
-  errorBox.textContent = 'No se pudo iniciar el juego. Comprueba tu conexión a Internet y abre el proyecto mediante un servidor local (consulta LEEME.txt).\\n\\nDetalle: ' + (err?.stack || err);
-}
-
-function startGame(THREE) {
-  gameModuleReady = true;
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x9bc4d2);
-  scene.fog = new THREE.Fog(0x9bc4d2, 75, 260);
-
-  const camera = new THREE.PerspectiveCamera(65, innerWidth / innerHeight, 0.1, 500);
-  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-  renderer.setSize(innerWidth, innerHeight);
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.7));
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
-  document.body.appendChild(renderer.domElement);
-  renderer.domElement.style.display = 'none';
-
-  scene.add(new THREE.HemisphereLight(0xd8edff, 0x59614d, 2.0));
-  const sun = new THREE.DirectionalLight(0xffe5bd, 3.2);
-  sun.position.set(-45, 70, 35);
-  sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.camera.left = -90; sun.shadow.camera.right = 90;
-  sun.shadow.camera.top = 90; sun.shadow.camera.bottom = -90;
-  sun.shadow.bias = -0.0003;
-  scene.add(sun);
-
-  const mat = (color, roughness=0.88, metalness=0) => new THREE.MeshStandardMaterial({ color, roughness, metalness });
-  const groundMat = mat(0x657765);
-  const roadMat = mat(0x292f32);
-  const sidewalkMat = mat(0xa7a9a2);
-  const whiteMat = mat(0xe8e5d7);
-  const darkGlass = new THREE.MeshStandardMaterial({color:0x253e4a, roughness:0.3, metalness:0.2});
-  const grass = new THREE.Mesh(new THREE.PlaneGeometry(500,500), groundMat);
-  grass.rotation.x = -Math.PI/2; grass.position.y = -0.12; grass.receiveShadow = true; scene.add(grass);
-
-  function box(w,h,d,material,x,y,z,shadow=true) {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), material);
-    mesh.position.set(x,y,z); mesh.castShadow = shadow; mesh.receiveShadow = true; scene.add(mesh); return mesh;
-  }
-  // City blocks, wide roads and sidewalks.
-  const roadWidth=13, block=34, spacing=47;
-  for (let i=-4;i<=4;i++) {
-    const p=i*spacing;
-    const roadX = new THREE.Mesh(new THREE.PlaneGeometry(roadWidth,430),roadMat);
-    roadX.rotation.x=-Math.PI/2; roadX.position.set(p,0.005,0); scene.add(roadX);
-    const roadZ = new THREE.Mesh(new THREE.PlaneGeometry(430,roadWidth),roadMat);
-    roadZ.rotation.x=-Math.PI/2; roadZ.position.set(0,0.006,p); scene.add(roadZ);
-    for(let k=-4;k<=4;k++){
-      const q=k*spacing;
-      box(0.13,0.015,8,whiteMat,p,0.02,q+4,false);
-      box(8,0.015,0.13,whiteMat,q+4,0.021,p,false);
-      box(1.2,0.18,roadWidth+2,sidewalkMat,p+roadWidth/2+0.8,0.04,0,false);
-      box(roadWidth+2,0.18,1.2,sidewalkMat,0,0.04,p+roadWidth/2+0.8,false);
+      await channel.unsubscribe();
+    } catch (error) {
+      console.warn(error);
     }
   }
 
-  // Procedural buildings, leaving roads clear.
-  const buildingMats=[0xb6b3a8,0x8c9a9c,0xc4b29b,0x687b83,0xd0c9b8,0x9eaaa2].map(c=>mat(c));
-  const windowMats=[0x243c48,0x35535e,0x6f8587].map(c=>new THREE.MeshStandardMaterial({color:c,roughness:.25,metalness:.15}));
-  let seed=314159;
-  function rand(){ seed=(seed*1664525+1013904223)>>>0; return seed/4294967296; }
-  for(let gx=-4;gx<4;gx++) for(let gz=-4;gz<4;gz++){
-    if(Math.abs(gx)<1 && Math.abs(gz)<1) continue;
-    const cx=gx*spacing+spacing/2, cz=gz*spacing+spacing/2;
-    for(let n=0;n<3;n++){
-      const w=7+rand()*7, d=7+rand()*7, h=9+rand()*rand()*35;
-      const x=cx+(rand()-.5)*15, z=cz+(rand()-.5)*15;
-      const bm=buildingMats[Math.floor(rand()*buildingMats.length)];
-      box(w,h,d,bm,x,h/2,z);
-      // Ventanas simplificadas para que el escenario cargue rápido en PC.
-      // Se usan pocas piezas por edificio en lugar de miles de objetos individuales.
-      const floors=Math.min(3, Math.max(1, Math.floor(h/10)));
-      const cols=Math.min(2, Math.max(1, Math.floor(w/5)));
-      for(let f=1;f<floors;f++){
-        for(let col=0;col<cols;col++){
-          const wx=x-w/2+(col+1)*w/(cols+1);
-          box(Math.min(1.15,w/(cols+1)*.55),.75,.06,
-              windowMats[(col+f)%windowMats.length],wx,Math.min(h-1,f* h/floors),z+d/2+.035,false);
-        }
+  channel = null;
+
+  if (renderer) {
+    renderer.dispose();
+    renderer.domElement.remove();
+    renderer = null;
+  }
+
+  if (scene) {
+    scene.traverse((object) => {
+      if (object.isMesh || object.isSprite) {
+        object.geometry?.dispose();
+
+        const materials = Array.isArray(object.material)
+          ? object.material
+          : [object.material];
+
+        materials.forEach(material => material?.dispose());
       }
-      box(w+0.25,.25,d+0.25,mat(0x555d5d),x,h+.12,z,false);
-    }
+    });
   }
 
-  // Park trees and street lamps.
-  const trunkMat=mat(0x594536), leafMats=[mat(0x345b40),mat(0x426a43),mat(0x56764a)];
-  function tree(x,z,s=1){
-    const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.22*s,.34*s,2.2*s,7),trunkMat);
-    trunk.position.set(x,1.1*s,z); trunk.castShadow=true; scene.add(trunk);
-    const crown=new THREE.Mesh(new THREE.IcosahedronGeometry(1.35*s,1),leafMats[Math.floor(rand()*leafMats.length)]);
-    crown.position.set(x,2.8*s,z); crown.scale.set(1,1.15,1); crown.castShadow=true; scene.add(crown);
-  }
-  for(let i=0;i<55;i++){
-    const x=(rand()-.5)*370,z=(rand()-.5)*370;
-    if(Math.abs(x%spacing)<9 || Math.abs(z%spacing)<9) continue;
-    tree(x,z,.7+rand()*.65);
-  }
+  scene = null;
+  camera = null;
+  player = null;
+  remotes.clear();
 
-  // Player model: simple third-person character built from meshes.
-  const player=new THREE.Group(); scene.add(player);
-  const skin=mat(0xd3a17b), shirt=mat(0x3f786f), pants=mat(0x28313b), shoe=mat(0x171b1d), hair=mat(0x34271f);
-  const torso=new THREE.Mesh(new THREE.CapsuleGeometry(.42,.68,4,8),shirt);
-  torso.position.y=1.45; torso.castShadow=true; player.add(torso);
-  const head=new THREE.Mesh(new THREE.SphereGeometry(.28,16,12),skin);
-  head.position.y=2.18; head.castShadow=true; player.add(head);
-  const hairCap=new THREE.Mesh(new THREE.SphereGeometry(.285,12,8,0,Math.PI*2,0,Math.PI*.55),hair);
-  hairCap.position.y=2.24; player.add(hairCap);
-  const legs=[];
-  for(const side of [-1,1]){
-    const leg=new THREE.Mesh(new THREE.CapsuleGeometry(.16,.55,3,7),pants);
-    leg.position.set(side*.2,.58,0); leg.castShadow=true; player.add(leg); legs.push(leg);
-    const foot=new THREE.Mesh(new THREE.BoxGeometry(.25,.14,.4),shoe);
-    foot.position.set(side*.2,.16,-.08); foot.castShadow=true; player.add(foot);
-    const arm=new THREE.Mesh(new THREE.CapsuleGeometry(.12,.52,3,7),shirt);
-    arm.position.set(side*.49,1.5,0); arm.rotation.z=side*.12; arm.castShadow=true; player.add(arm);
-  }
-  player.position.set(0,0,4);
+  game.hidden = true;
+  menu.hidden = false;
+  $("playerCount").textContent = "1";
+  setStatus("Saliste de la sala. Puedes entrar nuevamente.");
+}
 
-  // A few parked cars for scale and atmosphere.
-  const carColors=[0x9d3e35,0x303b45,0xd0d0c5,0x526b84,0x77705d];
-  for(let i=0;i<22;i++){
-    const horizontal=rand()>.5;
-    const road=Math.round((rand()*6-3))*spacing;
-    const along=(rand()-.5)*300;
-    const x=horizontal?along:road+(rand()>.5?4.5:-4.5);
-    const z=horizontal?road+(rand()>.5?4.5:-4.5):along;
-    const color=mat(carColors[Math.floor(rand()*carColors.length)],.45,.15);
-    const car=new THREE.Group();
-    const body=new THREE.Mesh(new THREE.BoxGeometry(2,0.7,4),color); body.position.y=.65; body.castShadow=true; car.add(body);
-    const cabin=new THREE.Mesh(new THREE.BoxGeometry(1.55,.65,1.8),darkGlass); cabin.position.set(0,1.25,-.15); cabin.castShadow=true; car.add(cabin);
-    for(const wx of [-.82,.82]) for(const wz of [-1.25,1.25]){
-      const wheel=new THREE.Mesh(new THREE.CylinderGeometry(.32,.32,.18,12),shoe);
-      wheel.rotation.z=Math.PI/2; wheel.position.set(wx,.35,wz); car.add(wheel);
-    }
-    car.position.set(x,0,z); if(horizontal) car.rotation.y=Math.PI/2; scene.add(car);
-  }
+const roomFromUrl = new URLSearchParams(location.search).get("room");
 
-  // Third-person camera with mouse and gamepad support.
-  let yaw=0, pitch=.22, distance=7, pointerLocked=false;
-  const keys=new Set();
-  const blocked=new Set(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space']);
-  document.addEventListener('keydown',e=>{keys.add(e.code);if(blocked.has(e.code))e.preventDefault(); if(e.code==='KeyR'){player.position.set(0,0,4);player.velocity?.set(0,0,0);}});
-  document.addEventListener('keyup',e=>keys.delete(e.code));
-  renderer.domElement.addEventListener('click',()=>{renderer.domElement.requestPointerLock?.();});
-  document.addEventListener('pointerlockchange',()=>{pointerLocked=document.pointerLockElement===renderer.domElement; toast.style.opacity=pointerLocked?'0':'1';});
-  document.addEventListener('mousemove',e=>{if(pointerLocked){yaw-=e.movementX*.0022;pitch=Math.max(-.15,Math.min(.8,pitch+e.movementY*.0018));}});
-  renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
-
-  let verticalVelocity=0, grounded=true, walkPhase=0, frameCount=0, lastFpsTime=performance.now();
-  const clock=new THREE.Clock();
-  const cameraTarget=new THREE.Vector3(), desiredCamera=new THREE.Vector3();
-  const forward=new THREE.Vector3(), right=new THREE.Vector3(), move=new THREE.Vector3();
-  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-  function getGamepad(){
-    const pads=navigator.getGamepads?.()||[];
-    for(const p of pads) if(p && p.connected) return p;
-    return null;
-  }
-  function axis(p,i){const v=p?.axes?.[i]||0;return Math.abs(v)<.16?0:v;}
-  function update(dt){
-    if (gamePaused) return;
-    const pad=getGamepad();
-    const kForward=(keys.has('KeyW')||keys.has('ArrowUp')?1:0)-(keys.has('KeyS')||keys.has('ArrowDown')?1:0);
-    const kRight=(keys.has('KeyD')||keys.has('ArrowRight')?1:0)-(keys.has('KeyA')||keys.has('ArrowLeft')?1:0);
-    let f=kForward, r=kRight;
-    if(pad){r=axis(pad,0); f=-axis(pad,1); yaw-=axis(pad,2)*dt*2.4; pitch=clamp(pitch+axis(pad,3)*dt*1.5,-.15,.8);if((pad.buttons[0]?.pressed||pad.buttons[2]?.pressed)&&grounded){verticalVelocity=7.2;grounded=false;}}
-    if(keys.has('Space')&&grounded){verticalVelocity=7.2;grounded=false;}
-    move.set(0,0,0);
-    forward.set(-Math.sin(yaw),0,-Math.cos(yaw));
-    right.set(Math.cos(yaw),0,-Math.sin(yaw));
-    move.addScaledVector(forward,f).addScaledVector(right,r);
-    if(move.lengthSq()>1)move.normalize();
-    const running=keys.has('ShiftLeft')||keys.has('ShiftRight')||(pad?.buttons[10]?.pressed??false);
-    const speed=running?9.2:5.3;
-    player.position.addScaledVector(move,speed*dt);
-    player.position.x=clamp(player.position.x,-195,195);player.position.z=clamp(player.position.z,-195,195);
-    if(move.lengthSq()>.001){
-      player.rotation.y=Math.atan2(-move.x,-move.z);
-      walkPhase+=dt*(running?12:8);
-      legs[0].rotation.x=Math.sin(walkPhase)*.55;legs[1].rotation.x=-Math.sin(walkPhase)*.55;
-    }else{legs[0].rotation.x*=.8;legs[1].rotation.x*=.8;}
-    verticalVelocity-=19*dt;player.position.y+=verticalVelocity*dt;
-    if(player.position.y<0){player.position.y=0;verticalVelocity=0;grounded=true;}
-    cameraTarget.set(player.position.x,player.position.y+1.55,player.position.z);
-    const horizontal=distance*Math.cos(pitch), vertical=distance*Math.sin(pitch)+2.1;
-    desiredCamera.set(cameraTarget.x+Math.sin(yaw)*horizontal,cameraTarget.y+vertical,cameraTarget.z+Math.cos(yaw)*horizontal);
-    camera.position.lerp(desiredCamera,1-Math.exp(-8*dt));
-    camera.lookAt(cameraTarget);
-    controlStatus.textContent=pad?'MANDO CONECTADO':'TECLADO';
-  }
-  function animate(){
-    requestAnimationFrame(animate);
-    const dt=Math.min(clock.getDelta(),.04);
-    update(dt);renderer.render(scene,camera);
-    frameCount++;
-    const now=performance.now();
-    if(now-lastFpsTime>700){fpsLabel.textContent=Math.round(frameCount*1000/(now-lastFpsTime))+' FPS';frameCount=0;lastFpsTime=now;}
-  }
-  addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
-  addEventListener('gamepadconnected',()=>{toast.textContent='Mando conectado. Usa los sticks para moverte y mirar.';toast.style.opacity='1';setTimeout(()=>{if(!pointerLocked)toast.style.opacity='0';},3500);});
-  addEventListener('gamepaddisconnected',()=>{toast.textContent='Mando desconectado';toast.style.opacity='1';});
-  // No existe pantalla de carga: el menú principal permanece visible al iniciar.
-  const mainMenu = document.querySelector('#main-menu');
-  const hud = document.querySelector('#hud');
-  const controlsPanel = document.querySelector('#controls-panel');
-  const optionsPanel = document.querySelector('#options-panel');
-  const qualityDescription = document.querySelector('#quality-description');
-  let gamePaused = true;
-
-  function openMenu() {
-    gamePaused = true;
-    if (mainMenu) mainMenu.hidden = false;
-    renderer.domElement.style.display = 'none';
-    if (hud) hud.classList.add('hud-hidden');
-    if (controlsPanel) controlsPanel.hidden = true;
-    if (optionsPanel) optionsPanel.hidden = true;
-    document.exitPointerLock?.();
-  }
-
-  function startPlaying() {
-    gamePaused = false;
-    if (mainMenu) mainMenu.hidden = true;
-    if (controlsPanel) controlsPanel.hidden = true;
-    if (optionsPanel) optionsPanel.hidden = true;
-    renderer.domElement.style.display = 'block';
-    if (hud) hud.classList.remove('hud-hidden');
-    renderer.setSize(innerWidth, innerHeight);
-    camera.aspect = innerWidth / innerHeight;
-    camera.updateProjectionMatrix();
-    toast.textContent = 'Haz clic en el juego para activar la cámara';
-    toast.style.opacity = '1';
-  }
-
-  document.querySelector('#btn-start')?.addEventListener('click', startPlaying);
-  document.querySelector('#btn-controls')?.addEventListener('click', () => {
-    if (controlsPanel) controlsPanel.hidden = false;
-    if (optionsPanel) optionsPanel.hidden = true;
-  });
-  document.querySelector('#btn-options')?.addEventListener('click', () => {
-    if (optionsPanel) optionsPanel.hidden = false;
-    if (controlsPanel) controlsPanel.hidden = true;
-  });
-  document.querySelector('#btn-fullscreen')?.addEventListener('click', async () => {
-    try {
-      if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
-      else await document.exitFullscreen();
-    } catch (err) {
-      toast.textContent = 'No se pudo activar pantalla completa';
-      toast.style.opacity = '1';
-    }
-  });
-  document.querySelectorAll('[data-close="controls"]').forEach(btn => btn.addEventListener('click', () => {
-    if (controlsPanel) controlsPanel.hidden = true;
-  }));
-  document.querySelectorAll('[data-close="options"]').forEach(btn => btn.addEventListener('click', () => {
-    if (optionsPanel) optionsPanel.hidden = true;
-  }));
-  document.querySelectorAll('[data-quality]').forEach(btn => btn.addEventListener('click', () => {
-    document.querySelectorAll('[data-quality]').forEach(b => b.classList.remove('selected'));
-    btn.classList.add('selected');
-    const quality = btn.dataset.quality;
-    if (quality === 'low') {
-      renderer.setPixelRatio(1);
-      renderer.shadowMap.enabled = false;
-      if (qualityDescription) qualityDescription.textContent = 'Rendimiento priorizado para computadoras menos potentes.';
-    } else if (quality === 'high') {
-      renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-      renderer.shadowMap.enabled = true;
-      if (qualityDescription) qualityDescription.textContent = 'Mayor calidad visual; puede reducir los FPS.';
-    } else {
-      renderer.setPixelRatio(Math.min(devicePixelRatio, 1.7));
-      renderer.shadowMap.enabled = true;
-      if (qualityDescription) qualityDescription.textContent = 'Calidad equilibrada para la mayoría de computadoras.';
-    }
-    renderer.setSize(innerWidth, innerHeight);
-  }));
-  document.querySelector('#btn-pause')?.addEventListener('click', openMenu);
-
-  // Escape muestra el menú; al volver a iniciar, se reanuda el mundo.
-  document.addEventListener('keydown', e => {
-    if (e.code === 'Escape' && !gamePaused) {
-      e.preventDefault();
-      openMenu();
-    }
-  });
-
-  animate();
+if (roomFromUrl && /^[A-Z0-9_-]{3,20}$/i.test(roomFromUrl)) {
+  $("roomCode").value = roomFromUrl.toUpperCase();
 }
