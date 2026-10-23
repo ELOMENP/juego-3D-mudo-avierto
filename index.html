@@ -4,81 +4,61 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#101820">
-  <title>Ciudad Abierta 3D | Multijugador</title>
+  <title>Ciudad Abierta 3D</title>
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
-  <main id="menu" class="panel">
-    <div class="logo">CA<span>3D</span></div>
-    <h1>CIUDAD ABIERTA 3D</h1>
-    <p class="subtitle">Explora la ciudad con tus amigos</p>
+  <section id="menu" class="panel">
+    <h1>CIUDAD ABIERTA <span>3D</span></h1>
+    <p>Explora la ciudad y juega con tus amigos.</p>
 
-    <form id="joinForm">
-      <label for="playerName">Nombre del jugador</label>
-      <input
-        id="playerName"
-        type="text"
-        maxlength="18"
-        placeholder="Tu nombre"
-        autocomplete="nickname"
-        required
-      >
+    <label for="playerName">Nombre del jugador</label>
+    <input id="playerName" maxlength="18" placeholder="Escribe tu nombre">
 
-      <label for="roomCode">Código de la sala</label>
-      <input
-        id="roomCode"
-        type="text"
-        maxlength="20"
-        placeholder="Ejemplo: AMIGOS123"
-        autocomplete="off"
-      >
+    <label for="roomCode">Código de sala</label>
+    <input id="roomCode" maxlength="20" placeholder="Ejemplo: AMIGOS123">
 
-      <button id="joinButton" type="submit">
-        Entrar a la ciudad
-      </button>
+    <button id="joinButton">Entrar a la sala</button>
+    <button id="createButton" class="secondary">Crear sala nueva</button>
+    <p id="menuStatus">Escribe tu nombre para comenzar.</p>
+  </section>
 
-      <button id="newRoomButton" type="button" class="secondary">
-        Crear una sala nueva
-      </button>
-    </form>
-
-    <p id="menuStatus" class="status" role="status">
-      Escribe tu nombre para comenzar.
-    </p>
-
-    <p class="small">
-      Multijugador para hasta 10 participantes por sala.
-    </p>
-  </main>
-
-  <main id="game" hidden>
-    <div id="hud">
-      <div class="hud-brand">
-        <strong>CIUDAD ABIERTA <span>3D</span></strong>
-        <small>Sala: <b id="currentRoom">---</b></small>
-        <small>Jugadores: <b id="playerCount">1</b>/10</small>
+  <section id="game" hidden>
+    <header id="hud">
+      <div>
+        <strong>CIUDAD ABIERTA 3D</strong>
+        <p>Sala: <span id="currentRoom">---</span></p>
+        <p>Jugadores: <span id="playerCount">1</span>/10</p>
       </div>
 
-      <button id="copyRoomButton" class="small-button">
-        Invitar amigos
-      </button>
+      <div id="healthPanel">
+        <p>VIDA: <span id="healthText">100 / 100</span></p>
+        <div class="healthBackground">
+          <div id="healthFill"></div>
+        </div>
+        <p id="weaponText">Pistola: 12 / 12</p>
+      </div>
 
-      <button id="leaveButton" class="danger small-button">
-        Salir
-      </button>
-    </div>
+      <button id="inviteButton">Invitar</button>
+      <button id="leaveButton" class="danger">Salir</button>
+    </header>
 
-    <div id="help">
+    <div id="crosshair">+</div>
+
+    <aside id="controls">
       <strong>CONTROLES</strong>
-      <p>W A S D — Moverse</p>
-      <p>Shift — Correr</p>
-      <p>Ratón — Girar cámara</p>
-      <p>Esc — Liberar ratón</p>
-    </div>
+      <p>W A S D: moverse</p>
+      <p>Ratón: mirar</p>
+      <p>Clic izquierdo: disparar</p>
+      <p>R: recargar</p>
+      <p>1: pistola</p>
+      <p>2: rifle</p>
+      <p>Shift: correr</p>
+      <p>Esc: liberar ratón</p>
+    </aside>
 
-    <div id="notice" role="status"></div>
-  </main>
+    <div id="notice">Haz clic en la ciudad para jugar.</div>
+  </section>
 
   <script type="module" src="./game.js"></script>
 </body>
