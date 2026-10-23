@@ -15,8 +15,11 @@
       <input id="playerName" maxlength="18" placeholder="Jugador" value="Jugador" />
       <label for="roomCode">Código de sala</label>
       <input id="roomCode" maxlength="24" placeholder="sala1" value="sala1" />
-      <button id="joinBtn">Entrar al juego</button>
-      <p id="status" class="status">Configura Supabase en game.js para activar el multijugador.</p>
+      <div class="lobby-actions">
+        <button id="createLobbyBtn" type="button">Crear lobby</button>
+        <button id="joinBtn" type="button">Unirse a lobby</button>
+      </div>
+      <p id="status" class="status">Crea una sala nueva o escribe el código de una sala existente. Configura Supabase en game.js para activar el multijugador.</p>
       <small>WASD mover · Espacio saltar · Ctrl agacharse · Shift correr</small>
     </div>
   </div>
