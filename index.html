@@ -1,65 +1,54 @@
-<!doctype html>
+
+<!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Ciudad Abierta 3D</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ciudad Abierta 3D Multijugador</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <section id="main-menu" class="screen-menu">
-    <div class="menu-backdrop"></div>
-    <div class="menu-content">
-      <div class="menu-kicker"><span class="dot"></span> AVENTURA DE MUNDO ABIERTO</div>
-      <h1>CIUDAD<br><span>ABIERTA</span></h1>
-      <p class="menu-subtitle">Tu ciudad. Tu camino.</p>
-      <div class="menu-buttons">
-        <button id="btn-start" class="menu-btn primary">INICIAR PARTIDA <span>▶</span></button>
-        <button id="btn-controls" class="menu-btn">CONTROLES <span>⌨</span></button>
-        <button id="btn-options" class="menu-btn">AJUSTES GRÁFICOS <span>⚙</span></button>
-        <button id="btn-fullscreen" class="menu-btn">PANTALLA COMPLETA <span>⛶</span></button>
-      </div>
-      <div class="menu-footer">PROTOTIPO 0.2 · UN JUGADOR · SIN MYSQL</div>
-    </div>
-    <div id="controls-panel" class="menu-panel" hidden>
-      <button class="panel-close" data-close="controls">✕</button>
-      <h2>CONTROLES</h2>
-      <p><kbd>W A S D</kbd> Moverse</p><p><kbd>ESPACIO</kbd> Saltar</p><p><kbd>SHIFT</kbd> Correr</p>
-      <p><kbd>R</kbd> Reiniciar posición</p><p><kbd>ESC</kbd> Pausar / volver al menú</p>
-      <p>Ratón: mirar alrededor. Haz clic al jugar para activar la cámara.</p>
-      <p>Mando: stick izquierdo para moverse, stick derecho para mirar, A/X para saltar.</p>
-      <button class="menu-btn primary" data-close="controls">VOLVER</button>
-    </div>
-    <div id="options-panel" class="menu-panel" hidden>
-      <button class="panel-close" data-close="options">✕</button>
-      <h2>AJUSTES GRÁFICOS</h2>
-      <p>Elige un nivel para equilibrar calidad y rendimiento.</p>
-      <div class="quality-options">
-        <button class="quality-btn" data-quality="low">BAJO</button>
-        <button class="quality-btn selected" data-quality="medium">MEDIO</button>
-        <button class="quality-btn" data-quality="high">ALTO</button>
-      </div>
-      <p id="quality-description">Calidad equilibrada para jugar en la mayoría de computadoras.</p>
-      <button class="menu-btn primary" data-close="options">GUARDAR Y VOLVER</button>
-    </div>
-  </section>
+  <div id="menu" class="panel">
+    <h1>CIUDAD ABIERTA 3D</h1>
+    <p>Multijugador en línea</p>
 
-  <div id="hud" class="hud-hidden">
-    <div class="brand"><span class="dot"></span> CIUDAD ABIERTA <small>PROTOTIPO 0.2</small></div>
-    <div class="mission"><span class="mission-label">OBJETIVO</span><br>Explora la ciudad</div>
-    <div class="status"><span id="control-status">TECLADO</span><span class="separator">•</span><span id="fps">60 FPS</span></div>
-    <div class="help">
-      <b>CONTROLES</b>
-      <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Moverse</span>
-      <span><kbd>ESPACIO</kbd> Saltar</span><span><kbd>SHIFT</kbd> Correr</span>
-      <span><kbd>R</kbd> Reiniciar posición</span><span>Ratón: mover cámara · clic: capturar</span>
-      <span>Mando: stick izquierdo, stick derecho, A/X</span>
-      <button id="btn-pause" class="pause-btn">PAUSAR / MENÚ (ESC)</button>
-    </div>
-    <div class="crosshair">+</div>
-    <div id="toast">Pulsa en el juego para activar la cámara</div>
+    <label for="playerName">Tu nombre</label>
+    <input id="playerName" maxlength="18" placeholder="Escribe tu nombre">
+
+    <label for="roomCode">Código de sala</label>
+    <input id="roomCode" maxlength="20" placeholder="Ejemplo: AMIGOS123">
+
+    <button id="joinButton">Entrar a la ciudad</button>
+    <button id="newRoomButton" class="secondary">Crear sala nueva</button>
+
+    <p id="menuStatus">Introduce un nombre y un código para jugar con amigos.</p>
+    <p class="small">
+      Se necesita configurar Supabase para activar el multijugador.
+    </p>
   </div>
-  <div id="error" hidden></div>
+
+  <div id="game" hidden>
+    <div id="hud">
+      <div>
+        <strong>CIUDAD ABIERTA 3D</strong>
+        <div>Sala: <span id="currentRoom">---</span></div>
+        <div>Jugadores: <span id="playerCount">1</span>/10</div>
+      </div>
+      <button id="copyRoomButton">Copiar invitación</button>
+      <button id="leaveButton">Salir</button>
+    </div>
+
+    <div id="help">
+      <b>Controles</b><br>
+      W A S D — Moverse<br>
+      Flechas — Moverse<br>
+      Shift — Correr<br>
+      Ratón — Girar cámara
+    </div>
+
+    <div id="notice"></div>
+  </div>
+
   <script type="module" src="game.js"></script>
 </body>
 </html>
