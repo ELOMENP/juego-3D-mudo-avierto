@@ -1,20 +1,20 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ciudad Abierta 3D</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div id="menu">
     <div class="menu-panel">
       <h1>CIUDAD ABIERTA <span>3D</span></h1>
-      <p>Explora la ciudad. Sobrevive. Domina el combate.</p>
-      <input id="playerName" maxlength="16" placeholder="Tu nombre" value="Jugador" />
+      <p>Explora, combate y trabaja en equipo para sobrevivir.</p>
+      <input id="playerName" maxlength="16" value="Jugador" placeholder="Tu nombre">
       <button id="playButton">ENTRAR A LA CIUDAD</button>
-      <small>Multijugador mediante Supabase Realtime</small>
       <p id="menuError"></p>
+      <small>Multijugador · Sala pública</small>
     </div>
   </div>
 
@@ -37,30 +37,75 @@
     </div>
 
     <div id="crosshair">
-      <i class="line top"></i>
-      <i class="line bottom"></i>
-      <i class="line left"></i>
-      <i class="line right"></i>
+      <i class="top"></i>
+      <i class="bottom"></i>
+      <i class="left"></i>
+      <i class="right"></i>
       <i class="dot"></i>
     </div>
 
     <div id="hitMarker">×</div>
     <div id="notice"></div>
 
-    <div class="bottom-hint">
-      <span>W A S D · Mover</span>
-      <span>Mouse · Disparar</span>
-      <span>Click derecho · Apuntar</span>
-      <span>Shift · Correr</span>
-      <span>C · Agacharse / deslizarse</span>
-      <span>Espacio · Saltar</span>
-      <span>E · Reaparecer si estás derribado</span>
-      <span>Esc · Liberar cursor</span>
-    </div>
-
     <div id="downScreen" class="hidden">
       <h2>ESTÁS DERRIBADO</h2>
+      <p>Un compañero todavía puede reanimarte.</p>
+      <div class="timer-track">
+        <div id="downTimerFill"></div>
+      </div>
+      <h1 id="downTimer">30</h1>
+      <p id="reviveStatus">Espera a un compañero</p>
+      <p class="small-hint">Si te rematan, no podrás ser reanimado.</p>
+    </div>
+
+    <div id="eliminatedScreen" class="hidden">
+      <h2>ELIMINADO</h2>
       <p>Presiona E para reaparecer</p>
+    </div>
+
+    <div id="settingsMenu" class="hidden">
+      <div class="settings-panel">
+        <h2>AJUSTES</h2>
+
+        <label for="sensitivity">
+          Sensibilidad del mouse
+          <span id="sensitivityValue">2.2</span>
+        </label>
+        <input id="sensitivity" type="range" min="0.5" max="5" step="0.1" value="2.2">
+
+        <label for="fovSetting">
+          Campo de visión
+          <span id="fovValue">75</span>
+        </label>
+        <input id="fovSetting" type="range" min="60" max="110" step="1" value="75">
+
+        <label for="graphicsSetting">Calidad gráfica</label>
+        <select id="graphicsSetting">
+          <option value="low">Baja</option>
+          <option value="medium" selected>Media</option>
+          <option value="high">Alta</option>
+        </select>
+
+        <label class="check-label">
+          <input id="crosshairSetting" type="checkbox" checked>
+          Mostrar mira
+        </label>
+
+        <button id="resumeButton">VOLVER AL JUEGO</button>
+        <button id="resetSettingsButton">RESTABLECER AJUSTES</button>
+        <p class="small-hint">Presiona TAB para cerrar este menú.</p>
+      </div>
+    </div>
+
+    <div class="bottom-hint">
+      <span>WASD: mover</span>
+      <span>Mouse: disparar</span>
+      <span>Click derecho: apuntar</span>
+      <span>Shift: correr</span>
+      <span>C: agacharse/deslizarse</span>
+      <span>E: reanimar o reaparecer</span>
+      <span>TAB: ajustes</span>
+      <span>Esc: liberar cursor</span>
     </div>
   </div>
 
