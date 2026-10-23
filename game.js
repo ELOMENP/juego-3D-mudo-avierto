@@ -1,710 +1,350 @@
 
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js";
+import { PointerLockControls } from "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/controls/PointerLockControls.js";
 
-// CONFIGURA ESTOS DOS VALORES CON LOS DE TU PROYECTO SUPABASE
-const SUPABASE_URL = "https://vlwfntwxbzmeodutbrxd.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_JKRwt7biD2Y9wCQpQC9iQA_-EDPL17V";
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87ceeb);
+scene.fog = new THREE.Fog(0x87ceeb, 50, 220);
 
-const $ = id => document.getElementById(id);
-const MAX_PLAYERS = 10;
-const MAX_HEALTH = 100;
+const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
 
-const weapons = {
-  1: { name: "Pistola", damage: 25, capacity: 12, rate: 350, reload: 1200, range: 70 },
-  2: { name: "Rifle", damage: 12, capacity: 30, rate: 110, reload: 1700, range: 100 }
-};
+const controls = new PointerLockControls(camera, renderer.domElement);
+scene.add(controls.object);
+controls.object.position.set(0, 1.7, 0);
 
-const id = crypto.randomUUID();
-const keys = new Set();
-const remotes = new Map();
-const tracers = [];
+scene.add(new THREE.HemisphereLight(0xffffff, 0x667788, 2));
+const sun = new THREE.DirectionalLight(0xffffff, 2);
+sun.position.set(30, 60, 20);
+scene.add(sun);
 
-let db, channel, scene, camera, renderer, player;
-let name = "", room = "", started = false;
-let yaw = 0, pitch = 0.15;
-let x = 0, z = 0;
-let health = MAX_HEALTH;
-let weapon = 1;
-let ammo = { 1: 12, 2: 30 };
-let lastShot = 0, lastSync = 0, lastFrame = 0;
-let reloading = false, reloadEnd = 0, respawnAt = 0;
+// Suelo y ciudad
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(500, 500),
+  new THREE.MeshStandardMaterial({ color: 0x477447 })
+);
+ground.rotation.x = -Math.PI / 2;
+scene.add(ground);
 
-const menu = $("menu");
-const game = $("game");
-const status = $("menuStatus");
-
-function message(text) {
-  $("notice").textContent = text;
-}
-
-function updateHealth() {
-  $("healthText").textContent = `${health} / ${MAX_HEALTH}`;
-  $("healthFill").style.width = `${health}%`;
-  $("healthFill").style.background =
-    health <= 30 ? "#e53935" : health <= 60 ? "#f0a32b" : "#20bd78";
-}
-
-function updateWeapon() {
-  $("weaponText").textContent =
-    `${weapons[weapon].name}: ${ammo[weapon]} / ${weapons[weapon].capacity}` +
-    (reloading ? " · Recargando" : "");
-}
-
-function randomRoom() {
-  return Math.random().toString(36).slice(2, 8).toUpperCase();
-}
-
-$("roomCode").value =
-  new URLSearchParams(location.search).get("room")?.toUpperCase() || "";
-
-$("joinButton").addEventListener("click", () => start(false));
-$("createButton").addEventListener("click", () => start(true));
-
-async function start(createNew) {
-  if (started) return;
-
-  name = $("playerName").value.trim().slice(0, 18);
-  room = $("roomCode").value.trim().toUpperCase();
-
-  if (!name) {
-    status.textContent = "Escribe tu nombre.";
-    return;
-  }
-
-  if (createNew || !room) room = randomRoom();
-
-  if (!/^[A-Z0-9_-]{3,20}$/.test(room)) {
-    status.textContent = "El código debe tener entre 3 y 20 letras o números.";
-    return;
-  }
-
-  if (!SUPABASE_URL.startsWith("https://") ||
-      SUPABASE_URL.includes("PEGA_AQUI") ||
-      SUPABASE_ANON_KEY.includes("PEGA_AQUI") ||
-      SUPABASE_ANON_KEY.length < 20) {
-    status.textContent = "Primero configura la URL y la clave pública de Supabase en game.js.";
-    return;
-  }
-
-  $("joinButton").disabled = true;
-  $("createButton").disabled = true;
-  status.textContent = "Conectando con Supabase...";
-
-  try {
-    db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-    channel = db.channel("ciudad-" + room, {
-      config: {
-        broadcast: { self: false },
-        presence: { key: id }
-      }
-    });
-
-    channel.on("broadcast", { event: "position" }, ({ payload }) => {
-      if (!payload || payload.id === id) return;
-      let other = remotes.get(payload.id);
-      if (!other) other = addRemote(payload);
-
-      other.targetX = Number(payload.x) || 0;
-      other.targetZ = Number(payload.z) || 0;
-      other.targetYaw = Number(payload.yaw) || 0;
-
-      if (Number.isFinite(payload.health)) other.health = payload.health;
-      other.dead = Boolean(payload.dead);
-      other.group.visible = !other.dead;
-      colorRemote(other);
-    });
-
-    channel.on("broadcast", { event: "shot" }, ({ payload }) => {
-      if (!payload || payload.id === id) return;
-      drawTracer(
-        new THREE.Vector3(payload.x, payload.y, payload.z),
-        new THREE.Vector3(payload.dx, payload.dy, payload.dz),
-        10,
-        0xffd166
-      );
-    });
-
-    channel.on("broadcast", { event: "damage" }, ({ payload }) => {
-      if (!payload || payload.target !== id || payload.shooter === id) return;
-      if (health <= 0) return;
-
-      health = Math.max(0, health - Math.max(0, Number(payload.amount) || 0));
-      updateHealth();
-
-      if (health === 0) {
-        respawnAt = performance.now() + 4000;
-        message("Te eliminaron. Reaparecerás en 4 segundos.");
-      } else {
-        message(`${payload.shooterName || "Un jugador"} te disparó. Vida: ${health}`);
-      }
-
-      syncHealth();
-    });
-
-    channel.on("presence", { event: "sync" }, syncPlayers);
-
-    await new Promise((resolve, reject) => {
-      let done = false;
-      const timeout = setTimeout(() => {
-        if (!done) {
-          done = true;
-          reject(new Error("Tiempo agotado. Revisa la URL, la clave y Realtime."));
-        }
-      }, 15000);
-
-      channel.subscribe(async result => {
-        if (result === "SUBSCRIBED" && !done) {
-          try {
-            const current = Object.values(channel.presenceState()).flat();
-            if (current.length >= MAX_PLAYERS) {
-              done = true;
-              clearTimeout(timeout);
-              reject(new Error("La sala ya tiene 10 jugadores."));
-              return;
-            }
-
-            await channel.track({
-              id, name, x, z, yaw, health, dead: false
-            });
-
-            done = true;
-            clearTimeout(timeout);
-            resolve();
-          } catch (err) {
-            done = true;
-            clearTimeout(timeout);
-            reject(err);
-          }
-        }
-
-        if ((result === "CHANNEL_ERROR" || result === "TIMED_OUT") && !done) {
-          done = true;
-          clearTimeout(timeout);
-          reject(new Error("Supabase no pudo conectar con la sala."));
-        }
-      });
-    });
-
-    createWorld();
-    started = true;
-    menu.hidden = true;
-    game.hidden = false;
-    $("currentRoom").textContent = room;
-    updateHealth();
-    updateWeapon();
-
-    const url = new URL(location.href);
-    url.searchParams.set("room", room);
-    history.replaceState(null, "", url);
-    message("Conectado. Haz clic en la ciudad para jugar.");
-    requestAnimationFrame(animate);
-
-  } catch (err) {
-    console.error(err);
-    status.textContent = "Error: " + (err.message || "No se pudo conectar.");
-    try { await channel?.unsubscribe(); } catch {}
-    channel = null;
-  } finally {
-    $("joinButton").disabled = false;
-    $("createButton").disabled = false;
-  }
-}
-
-function syncPlayers() {
-  if (!channel || !scene) return;
-
-  const entries = Object.values(channel.presenceState()).flat();
-  const activeIds = new Set();
-
-  for (const data of entries) {
-    if (!data.id || data.id === id) continue;
-    activeIds.add(data.id);
-    if (!remotes.has(data.id)) addRemote(data);
-  }
-
-  for (const [remoteId, other] of remotes) {
-    if (!activeIds.has(remoteId)) {
-      scene.remove(other.group);
-      remotes.delete(remoteId);
-    }
-  }
-
-  $("playerCount").textContent =
-    String(Math.min(MAX_PLAYERS, new Set(entries.map(p => p.id)).size));
-}
-
-function createWorld() {
-  scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x8bc7ed);
-  scene.fog = new THREE.Fog(0x8bc7ed, 90, 250);
-
-  camera = new THREE.PerspectiveCamera(
-    70, window.innerWidth / window.innerHeight, 0.1, 500
+for (let i = -100; i <= 100; i += 25) {
+  const road = new THREE.Mesh(
+    new THREE.PlaneGeometry(12, 220),
+    new THREE.MeshStandardMaterial({ color: 0x34383d })
   );
+  road.rotation.x = -Math.PI / 2;
+  road.position.set(i, 0.02, 0);
+  scene.add(road);
 
-  renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.shadowMap.enabled = true;
-  game.insertBefore(renderer.domElement, $("hud"));
-
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x53634b, 2));
-
-  const sun = new THREE.DirectionalLight(0xffffff, 2);
-  sun.position.set(40, 70, 30);
-  sun.castShadow = true;
-  scene.add(sun);
-
-  const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(260, 260),
-    new THREE.MeshStandardMaterial({ color: 0x4d844b })
+  const crossRoad = new THREE.Mesh(
+    new THREE.PlaneGeometry(220, 12),
+    new THREE.MeshStandardMaterial({ color: 0x34383d })
   );
-  ground.rotation.x = -Math.PI / 2;
-  ground.receiveShadow = true;
-  scene.add(ground);
-
-  // Calles
-  for (let n = -100; n <= 100; n += 40) {
-    addBox(12, 0.08, 260, 0x343a40, n, 0.06, 0);
-    addBox(260, 0.08, 12, 0x343a40, 0, 0.06, n);
-    addBox(0.08, 0.02, 260, 0xe8dfb4, n, 0.11, 0);
-    addBox(260, 0.02, 0.08, 0xe8dfb4, 0, 0.11, n);
-  }
-
-  // Edificios
-  for (let bx = -90; bx <= 90; bx += 20) {
-    for (let bz = -90; bz <= 90; bz += 20) {
-      if (Math.abs(bx % 40) < 8 || Math.abs(bz % 40) < 8) continue;
-
-      const w = 7 + Math.random() * 4;
-      const d = 7 + Math.random() * 4;
-      const h = 5 + Math.random() * 24;
-      const color = new THREE.Color().setHSL(
-        0.55 + Math.random() * 0.08,
-        0.12 + Math.random() * 0.18,
-        0.35 + Math.random() * 0.25
-      );
-
-      const building = new THREE.Mesh(
-        new THREE.BoxGeometry(w, h, d),
-        new THREE.MeshStandardMaterial({ color })
-      );
-      building.position.set(
-        bx + (Math.random() - 0.5) * 5,
-        h / 2,
-        bz + (Math.random() - 0.5) * 5
-      );
-      building.castShadow = true;
-      building.receiveShadow = true;
-      scene.add(building);
-    }
-  }
-
-  player = createCharacter(0x20bd78, name);
-  player.position.set(x, 0, z);
-  scene.add(player);
-
-  window.addEventListener("resize", resize);
-  window.addEventListener("keydown", keyDown);
-  window.addEventListener("keyup", keyUp);
-  document.addEventListener("mousemove", mouseMove);
-  renderer.domElement.addEventListener("click", canvasClick);
-  document.addEventListener("contextmenu", e => e.preventDefault());
+  crossRoad.rotation.x = -Math.PI / 2;
+  crossRoad.position.set(0, 0.03, i);
+  scene.add(crossRoad);
 }
 
-function addBox(w, h, d, color, px, py, pz) {
+for (let x = -90; x <= 90; x += 25) {
+  for (let z = -90; z <= 90; z += 25) {
+    if (Math.abs(x) < 18 || Math.abs(z) < 18) continue;
+
+    const h = 5 + Math.random() * 18;
+    const building = new THREE.Mesh(
+      new THREE.BoxGeometry(10, h, 10),
+      new THREE.MeshStandardMaterial({
+        color: new THREE.Color().setHSL(0.58, 0.13, 0.36 + Math.random() * 0.2)
+      })
+    );
+    building.position.set(x, h / 2, z);
+    scene.add(building);
+  }
+}
+
+// Armas y manos en primera persona
+const weaponGroup = new THREE.Group();
+camera.add(weaponGroup);
+weaponGroup.position.set(0.35, -0.3, -0.65);
+
+const metal = new THREE.MeshStandardMaterial({
+  color: 0x30343b,
+  metalness: 0.7,
+  roughness: 0.3
+});
+const dark = new THREE.MeshStandardMaterial({ color: 0x17191c });
+const skin = new THREE.MeshStandardMaterial({ color: 0xc58c66 });
+
+function makeBox(parent, material, size, position) {
   const mesh = new THREE.Mesh(
-    new THREE.BoxGeometry(w, h, d),
-    new THREE.MeshStandardMaterial({ color })
+    new THREE.BoxGeometry(...size),
+    material
   );
-  mesh.position.set(px, py, pz);
-  mesh.receiveShadow = true;
-  scene.add(mesh);
+  mesh.position.set(...position);
+  parent.add(mesh);
+  return mesh;
 }
 
-function createCharacter(color, label) {
-  const group = new THREE.Group();
-
-  const body = new THREE.Mesh(
-    new THREE.BoxGeometry(0.8, 1.3, 0.45),
-    new THREE.MeshStandardMaterial({ color })
+function makeCylinder(parent, material, radiusTop, radiusBottom, length, position, rotation) {
+  const mesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(radiusTop, radiusBottom, length, 12),
+    material
   );
-  body.position.y = 1.15;
-  body.castShadow = true;
-  group.add(body);
-
-  const head = new THREE.Mesh(
-    new THREE.SphereGeometry(0.32, 16, 12),
-    new THREE.MeshStandardMaterial({ color: 0xe8bd94 })
-  );
-  head.position.y = 2.05;
-  group.add(head);
-
-  const canvas = document.createElement("canvas");
-  canvas.width = 512;
-  canvas.height = 128;
-  const ctx = canvas.getContext("2d");
-  ctx.font = "bold 42px Arial";
-  ctx.textAlign = "center";
-  ctx.lineWidth = 6;
-  ctx.strokeStyle = "#111827";
-  ctx.fillStyle = "white";
-  ctx.strokeText(String(label).slice(0, 18), 256, 78);
-  ctx.fillText(String(label).slice(0, 18), 256, 78);
-
-  const texture = new THREE.CanvasTexture(canvas);
-  const sprite = new THREE.Sprite(
-    new THREE.SpriteMaterial({ map: texture, transparent: true })
-  );
-  sprite.position.y = 2.7;
-  sprite.scale.set(2.6, 0.65, 1);
-  group.add(sprite);
-
-  return group;
+  mesh.position.set(...position);
+  mesh.rotation.set(...rotation);
+  parent.add(mesh);
+  return mesh;
 }
 
-function addRemote(data) {
-  if (!scene || !data.id || data.id === id) return null;
+// Dos manos visibles sujetando el arma
+const leftHand = makeBox(weaponGroup, skin, [0.12, 0.12, 0.22], [-0.16, -0.10, -0.12]);
+leftHand.rotation.x = -0.2;
 
-  const group = createCharacter(0xf0a33b, data.name || "Jugador");
-  group.position.set(Number(data.x) || 0, 0, Number(data.z) || 0);
-  scene.add(group);
+const rightHand = makeBox(weaponGroup, skin, [0.13, 0.13, 0.20], [0.04, -0.10, 0.04]);
+rightHand.rotation.x = -0.2;
 
-  const other = {
-    id: data.id,
-    group,
-    targetX: Number(data.x) || 0,
-    targetZ: Number(data.z) || 0,
-    targetYaw: Number(data.yaw) || 0,
-    health: Number.isFinite(data.health) ? data.health : MAX_HEALTH,
-    dead: Boolean(data.dead)
-  };
+// Pistola
+const pistol = new THREE.Group();
+weaponGroup.add(pistol);
+makeBox(pistol, metal, [0.12, 0.12, 0.32], [0, 0, -0.12]);
+makeBox(pistol, dark, [0.09, 0.19, 0.10], [0, -0.13, -0.01]);
+makeCylinder(pistol, dark, 0.035, 0.035, 0.22, [0, 0.01, -0.37], [Math.PI / 2, 0, 0]);
+makeBox(pistol, metal, [0.07, 0.025, 0.08], [0, 0.08, -0.14]);
 
-  remotes.set(data.id, other);
-  colorRemote(other);
-  group.visible = !other.dead;
-  return other;
+// Rifle
+const rifle = new THREE.Group();
+weaponGroup.add(rifle);
+makeBox(rifle, metal, [0.14, 0.15, 0.48], [0, 0, -0.12]);
+makeBox(rifle, dark, [0.11, 0.22, 0.13], [0, -0.17, -0.02]);
+makeBox(rifle, dark, [0.08, 0.18, 0.09], [0, -0.10, 0.13]);
+makeCylinder(rifle, metal, 0.025, 0.025, 0.48, [0, 0.02, -0.55], [Math.PI / 2, 0, 0]);
+makeBox(rifle, dark, [0.05, 0.12, 0.08], [0, 0.12, -0.12]);
+
+let currentWeapon = 1;
+rifle.visible = false;
+
+// Controles y estado
+const keys = {};
+let playing = false;
+let grounded = true;
+let verticalVelocity = 0;
+let health = 100;
+let ammo = 12;
+let aiming = false;
+let lastShot = 0;
+
+const playerHeight = 1.7;
+const raycaster = new THREE.Raycaster();
+raycaster.far = 150;
+
+const menu = document.getElementById("menu");
+const hud = document.getElementById("hud");
+const statusText = document.getElementById("status");
+
+function updateHUD() {
+  document.getElementById("health").textContent = `Vida: ${health}`;
+  document.getElementById("weapon").textContent =
+    `Arma: ${currentWeapon === 1 ? "Pistola" : "Rifle"}`;
+  document.getElementById("ammo").textContent = `Munición: ${ammo}`;
 }
 
-function colorRemote(other) {
-  const color = other.dead ? 0x555555 :
-    other.health <= 30 ? 0xd92d20 : 0xf0a33b;
+document.getElementById("joinBtn").addEventListener("click", () => {
+  const name = document.getElementById("playerName").value.trim();
+  const room = document.getElementById("roomCode").value.trim();
 
-  other.group.children.forEach(obj => {
-    if (obj.isMesh && obj.geometry.type === "BoxGeometry") {
-      obj.material.color.set(color);
-    }
-  });
-}
-
-function canvasClick(event) {
-  if (document.pointerLockElement !== renderer.domElement) {
-    renderer.domElement.requestPointerLock?.();
+  if (!name || !room) {
+    statusText.textContent = "Escribe tu nombre y el código de sala.";
     return;
   }
 
-  if (event.button === 0) shoot();
-}
+  playing = true;
+  menu.style.display = "none";
+  hud.style.display = "block";
+  updateHUD();
+  controls.lock();
+});
 
-function keyDown(event) {
-  const key = event.key.toLowerCase();
+document.getElementById("releaseBtn").addEventListener("click", () => controls.unlock());
 
-  if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) {
+document.getElementById("leaveBtn").addEventListener("click", () => {
+  playing = false;
+  controls.unlock();
+  hud.style.display = "none";
+  menu.style.display = "flex";
+  statusText.textContent = "Saliste de la ciudad.";
+});
+
+controls.addEventListener("unlock", () => {
+  if (playing) statusText.textContent = "Ratón liberado. Haz clic en el juego para volver.";
+});
+
+controls.addEventListener("lock", () => {
+  if (playing) statusText.textContent = "Jugando";
+});
+
+// Liberar ratón con º
+document.addEventListener("keydown", (event) => {
+  if (
+    event.key === "º" ||
+    event.key === "ª" ||
+    event.code === "Backquote"
+  ) {
+    controls.unlock();
+    return;
+  }
+
+  if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.code)) {
     event.preventDefault();
   }
 
-  if (!keys.has(key)) {
-    if (key === "r") reload();
-    if (key === "1" || key === "2") {
-      weapon = Number(key);
-      updateWeapon();
-    }
+  keys[event.code] = true;
+  if (!playing) return;
+
+  if (event.code === "Space" && grounded) {
+    verticalVelocity = 8;
+    grounded = false;
   }
 
-  keys.add(key);
-}
+  if (event.code === "Digit1") {
+    currentWeapon = 1;
+    pistol.visible = true;
+    rifle.visible = false;
+    ammo = 12;
+    updateHUD();
+  }
 
-function keyUp(event) {
-  keys.delete(event.key.toLowerCase());
-}
+  if (event.code === "Digit2") {
+    currentWeapon = 2;
+    pistol.visible = false;
+    rifle.visible = true;
+    ammo = 30;
+    updateHUD();
+  }
 
-function mouseMove(event) {
-  if (document.pointerLockElement !== renderer?.domElement) return;
+  if (event.code === "KeyR") {
+    ammo = currentWeapon === 1 ? 12 : 30;
+    updateHUD();
+  }
+});
 
-  // Giro corregido: el ratón hacia la derecha mira hacia la derecha.
-  yaw += event.movementX * 0.0025;
-  pitch = THREE.MathUtils.clamp(
-    pitch - event.movementY * 0.0015, -0.4, 0.7
-  );
-}
+document.addEventListener("keyup", (event) => {
+  keys[event.code] = false;
+});
 
-function reload() {
-  if (!started || health <= 0 || reloading) return;
+// Apuntar con botón derecho
+document.addEventListener("contextmenu", (event) => event.preventDefault());
 
-  if (ammo[weapon] >= weapons[weapon].capacity) {
-    message("El cargador está lleno.");
+document.addEventListener("mousedown", (event) => {
+  if (!playing || !controls.isLocked) return;
+
+  if (event.button === 2) {
+    aiming = true;
+    camera.fov = 48;
+    camera.updateProjectionMatrix();
+    weaponGroup.position.set(0.15, -0.22, -0.48);
     return;
   }
 
-  reloading = true;
-  reloadEnd = performance.now() + weapons[weapon].reload;
-  updateWeapon();
-  message("Recargando...");
-}
-
-function shoot() {
-  if (!started || health <= 0 || reloading) return;
+  if (event.button !== 0) return;
 
   const now = performance.now();
-  const w = weapons[weapon];
-
-  if (now - lastShot < w.rate) return;
-
-  if (ammo[weapon] <= 0) {
-    message("Sin munición. Pulsa R para recargar.");
-    return;
-  }
-
+  const cooldown = currentWeapon === 1 ? 300 : 100;
+  if (now - lastShot < cooldown) return;
   lastShot = now;
-  ammo[weapon]--;
-  updateWeapon();
 
-  const direction = new THREE.Vector3(
-    Math.sin(yaw) * Math.cos(pitch),
-    Math.sin(pitch),
-    -Math.cos(yaw) * Math.cos(pitch)
-  ).normalize();
+  if (ammo <= 0) return;
 
-  const origin = camera.position.clone();
-  const ray = new THREE.Raycaster(origin, direction, 0, w.range);
-  const targets = [];
+  ammo--;
+  updateHUD();
+  shootStraight();
+});
 
-  for (const other of remotes.values()) {
-    if (other.dead || !other.group.visible || other.health <= 0) continue;
-
-    other.group.traverse(obj => {
-      if (obj.isMesh) {
-        obj.userData.targetPlayerId = other.id;
-        targets.push(obj);
-      }
-    });
+document.addEventListener("mouseup", (event) => {
+  if (event.button === 2) {
+    aiming = false;
+    camera.fov = 75;
+    camera.updateProjectionMatrix();
+    weaponGroup.position.set(0.35, -0.3, -0.65);
   }
+});
 
-  const hits = ray.intersectObjects(targets, false);
-  let targetId = null;
+// Disparo recto hacia el centro de la pantalla
+function shootStraight() {
+  camera.updateMatrixWorld(true);
 
-  if (hits.length) {
-    targetId = hits[0].object.userData.targetPlayerId;
-  }
+  const direction = new THREE.Vector3();
+  camera.getWorldDirection(direction);
 
-  if (targetId) {
-    channel?.send({
-      type: "broadcast",
-      event: "damage",
-      payload: {
-        shooter: id,
-        shooterName: name,
-        target: targetId,
-        amount: w.damage
-      }
-    });
-    message("¡Disparo realizado!");
-  }
+  const origin = camera.getWorldPosition(new THREE.Vector3());
+  raycaster.set(origin, direction);
 
-  channel?.send({
-    type: "broadcast",
-    event: "shot",
-    payload: {
-      id,
-      x: origin.x,
-      y: origin.y,
-      z: origin.z,
-      dx: direction.x,
-      dy: direction.y,
-      dz: direction.z
-    }
-  });
-
-  drawTracer(origin, direction, targetId ? 12 : 7, 0xfff3a3);
-}
-
-function drawTracer(origin, direction, length, color = 0xffd166) {
-  if (!scene) return;
-
-  const end = origin.clone().add(direction.clone().multiplyScalar(length));
-  const geometry = new THREE.BufferGeometry().setFromPoints([origin, end]);
-  const line = new THREE.Line(
-    geometry,
-    new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.9 })
+  // Comprueba impactos contra edificios y suelo.
+  const targets = scene.children.filter((obj) =>
+    obj.isMesh && obj !== ground &&
+    obj.parent !== weaponGroup &&
+    !obj.userData.isTracer
   );
 
-  scene.add(line);
-  tracers.push({ line, expires: performance.now() + 100 });
-}
+  const hits = raycaster.intersectObjects(targets, false);
+  const end = hits.length
+    ? hits[0].point.clone()
+    : origin.clone().add(direction.multiplyScalar(100));
 
-function syncHealth() {
-  channel?.send({
-    type: "broadcast",
-    event: "position",
-    payload: {
-      id, name, x, z, yaw, health, dead: health <= 0
-    }
-  });
-}
+  // Efecto visual de la bala en línea recta
+  const points = [origin.clone(), end.clone()];
+  const geometry = new THREE.BufferGeometry().setFromPoints(points);
+  const material = new THREE.LineBasicMaterial({ color: 0xffe38a });
+  const tracer = new THREE.Line(geometry, material);
+  tracer.userData.isTracer = true;
+  scene.add(tracer);
 
-function resize() {
-  if (!camera || !renderer) return;
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-}
+  setTimeout(() => {
+    scene.remove(tracer);
+    geometry.dispose();
+    material.dispose();
+  }, 70);
 
-function animate(now = 0) {
-  if (!started) return;
+  // Pequeño retroceso del arma
+  weaponGroup.position.z += 0.045;
+  setTimeout(() => {
+    weaponGroup.position.z = aiming ? -0.48 : -0.65;
+  }, 70);
+});
+
+// Movimiento y salto
+const clock = new THREE.Clock();
+
+function animate() {
   requestAnimationFrame(animate);
+  const delta = Math.min(clock.getDelta(), 0.05);
 
-  const delta = Math.min((now - lastFrame) / 1000 || 0, 0.05);
-  lastFrame = now;
+  if (playing && controls.isLocked) {
+    const speed = keys["ShiftLeft"] || keys["ShiftRight"] ? 12 : 6;
 
-  if (reloading && now >= reloadEnd) {
-    ammo[weapon] = weapons[weapon].capacity;
-    reloading = false;
-    updateWeapon();
-    message("Cargador listo.");
-  }
+    if (keys["KeyW"]) controls.moveForward(speed * delta);
+    if (keys["KeyS"]) controls.moveForward(-speed * delta);
+    if (keys["KeyA"]) controls.moveRight(-speed * delta);
+    if (keys["KeyD"]) controls.moveRight(speed * delta);
 
-  if (health <= 0 && respawnAt && now >= respawnAt) {
-    health = MAX_HEALTH;
-    x = (Math.random() - 0.5) * 20;
-    z = (Math.random() - 0.5) * 20;
-    respawnAt = 0;
-    updateHealth();
-    message("Has reaparecido.");
-    syncHealth();
-  }
+    verticalVelocity -= 20 * delta;
+    controls.object.position.y += verticalVelocity * delta;
 
-  if (health > 0) {
-    let forward = 0, side = 0;
-
-    if (keys.has("w") || keys.has("arrowup")) forward++;
-    if (keys.has("s") || keys.has("arrowdown")) forward--;
-    if (keys.has("d") || keys.has("arrowright")) side++;
-    if (keys.has("a") || keys.has("arrowleft")) side--;
-
-    const len = Math.hypot(forward, side) || 1;
-    forward /= len;
-    side /= len;
-
-    const speed = 7 * (keys.has("shift") ? 1.7 : 1) * delta;
-
-    x += (side * Math.cos(yaw) + forward * Math.sin(yaw)) * speed;
-    z += (side * Math.sin(yaw) - forward * Math.cos(yaw)) * speed;
-
-    x = THREE.MathUtils.clamp(x, -120, 120);
-    z = THREE.MathUtils.clamp(z, -120, 120);
-  }
-
-  player.position.set(x, 0, z);
-  player.rotation.y = yaw;
-
-  const cameraTarget = new THREE.Vector3(
-    x - Math.sin(yaw) * 7,
-    4 + pitch * 2,
-    z + Math.cos(yaw) * 7
-  );
-
-  camera.position.lerp(cameraTarget, 0.15);
-  camera.lookAt(x, 1.4 + pitch * 2, z);
-
-  for (const other of remotes.values()) {
-    other.group.position.x = THREE.MathUtils.lerp(
-      other.group.position.x, other.targetX, 0.2
-    );
-    other.group.position.z = THREE.MathUtils.lerp(
-      other.group.position.z, other.targetZ, 0.2
-    );
-    other.group.rotation.y = other.targetYaw;
-  }
-
-  for (let i = tracers.length - 1; i >= 0; i--) {
-    if (now >= tracers[i].expires) {
-      scene.remove(tracers[i].line);
-      tracers[i].line.geometry.dispose();
-      tracers[i].line.material.dispose();
-      tracers.splice(i, 1);
+    if (controls.object.position.y <= playerHeight) {
+      controls.object.position.y = playerHeight;
+      verticalVelocity = 0;
+      grounded = true;
     }
-  }
-
-  if (now - lastSync > 100) {
-    lastSync = now;
-
-    channel?.send({
-      type: "broadcast",
-      event: "position",
-      payload: {
-        id, name, x, z, yaw, health, dead: health <= 0
-      }
-    });
   }
 
   renderer.render(scene, camera);
 }
 
-$("inviteButton").addEventListener("click", async () => {
-  const url = new URL(location.href);
-  url.searchParams.set("room", room);
+animate();
 
-  try {
-    await navigator.clipboard.writeText(url.toString());
-    message("Enlace de invitación copiado.");
-  } catch {
-    message("Comparte este enlace: " + url.toString());
-  }
-});
-
-$("leaveButton").addEventListener("click", async () => {
-  started = false;
-  document.exitPointerLock?.();
-
-  window.removeEventListener("resize", resize);
-  window.removeEventListener("keydown", keyDown);
-  window.removeEventListener("keyup", keyUp);
-  document.removeEventListener("mousemove", mouseMove);
-
-  try {
-    await channel?.unsubscribe();
-  } catch (err) {
-    console.warn(err);
-  }
-
-  if (renderer) {
-    renderer.dispose();
-    renderer.domElement.remove();
-  }
-
-  scene = null;
-  camera = null;
-  renderer = null;
-  player = null;
-  channel = null;
-  remotes.clear();
-  tracers.length = 0;
-  keys.clear();
-
-  health = MAX_HEALTH;
-  ammo = { 1: 12, 2: 30 };
-  weapon = 1;
-  reloading = false;
-  respawnAt = 0;
-  x = 0;
-  z = 0;
-  yaw = 0;
-  pitch = 0.15;
-
-  game.hidden = true;
-  menu.hidden = false;
-  $("playerCount").textContent = "1";
-  status.textContent = "Saliste de la sala. Puedes entrar otra vez.";
+window.addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
 });
