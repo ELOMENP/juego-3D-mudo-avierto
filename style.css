@@ -9,11 +9,8 @@ h1 { margin: 0 0 8px; font-size: 30px; }
 label { display: block; margin: 16px 0 6px; font-size: 13px; color: #dce7f2; }
 input { width: 100%; padding: 12px; border: 1px solid #435266; border-radius: 7px; color: white; background: #0a111a; outline: none; }
 button { cursor: pointer; border: 0; border-radius: 7px; padding: 12px 16px; font-weight: bold; }
-.lobby-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px; }
-.lobby-actions button { width: 100%; min-height: 44px; }
-#createLobbyBtn { color: #07111c; background: #6ed7ff; }
-#joinBtn { color: #fff; background: #30465e; border: 1px solid #61758b; }
-.lobby-actions button:disabled { opacity: .6; cursor: wait; }
+#joinBtn { width: 100%; margin-top: 18px; color: #07111c; background: #6ed7ff; }
+#joinBtn:disabled { opacity: .6; cursor: wait; }
 .status { min-height: 38px; font-size: 12px; }
 small { display: block; color: #a9b7c7; line-height: 1.5; }
 #hud { position: fixed; inset: 0; pointer-events: none; }
@@ -29,4 +26,4 @@ small { display: block; color: #a9b7c7; line-height: 1.5; }
 .crosshair { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font: 28px Arial; color: #fff; text-shadow: 0 1px 4px #000; }
 .help { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); width: max-content; max-width: calc(100% - 24px); text-align: center; padding: 8px 12px; border-radius: 6px; color: #e7edf4; background: #07111dcc; font-size: 11px; }
 .leave { pointer-events: auto; position: absolute; left: 14px; top: 14px; color: white; background: #9d2f39; padding: 9px 12px; }
-@media (max-width: 600px) { .lobby-actions { grid-template-columns: 1fr; } .scoreboard { width: 160px; top: 8px; right: 8px; } .stats { left: 8px; bottom: 74px; max-width: calc(100% - 180px); } .stats span { font-size: 11px; padding: 6px; } .help { font-size: 10px; bottom: 8px; } }
+@media (max-width: 600px) { .scoreboard { width: 160px; top: 8px; right: 8px; } .stats { left: 8px; bottom: 74px; max-width: calc(100% - 180px); } .stats span { font-size: 11px; padding: 6px; } .help { font-size: 10px; bottom: 8px; } }

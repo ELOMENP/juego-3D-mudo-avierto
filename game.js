@@ -3,11 +3,11 @@ import { PointerLockControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
 // PEGA aquí los datos de Supabase. Usa la URL del proyecto y la clave PUBLICABLE/anon, nunca service_role.
-const SUPABASE_URL = 'https://vlwfntwxbzmeodutbrxd.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_JKRwt7biD2Y9wCQpQC9iQA_-EDPL17V';
+const SUPABASE_URL = 'PEGA_AQUI_TU_URL';
+const SUPABASE_KEY = 'PEGA_AQUI_TU_CLAVE_PUBLICA';
 
 const $ = (id) => document.getElementById(id);
-const menu = $('menu'), hud = $('hud'), statusText = $('status'), joinBtn = $('joinBtn'), createLobbyBtn = $('createLobbyBtn');
+const menu = $('menu'), hud = $('hud'), statusText = $('status'), joinBtn = $('joinBtn');
 let supabase = null, channel = null, roomCode = '', playerId = crypto.randomUUID();
 let playerName = 'Jugador', playing = false, dead = false;
 let health = 100, kills = 0, weaponMode = 1, ammo = { 1: 12, 2: 30 }, maxAmmo = { 1: 12, 2: 30 };
@@ -178,45 +178,17 @@ async function connectRoom() {
   }
 }
 
-async function enterLobby(isCreating = false) {
+joinBtn.addEventListener('click', async () => {
   playerName = $('playerName').value.trim().slice(0, 18) || 'Jugador';
-  if (isCreating) {
-    // Código corto y fácil de compartir con amigos.
-    roomCode = Math.random().toString(36).slice(2, 8).toUpperCase();
-    $('roomCode').value = roomCode;
-  } else {
-    roomCode = $('roomCode').value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 24);
-    if (!roomCode) {
-      statusText.textContent = 'Escribe el código de la sala o pulsa “Crear lobby”.';
-      return;
-    }
-  }
-
-  joinBtn.disabled = true;
-  createLobbyBtn.disabled = true;
-  statusText.textContent = isCreating ? `Creando lobby ${roomCode}…` : `Buscando lobby ${roomCode}…`;
-  const connected = await connectRoom();
-  if (!connected) {
-    joinBtn.disabled = false;
-    createLobbyBtn.disabled = false;
-    return;
-  }
-
-  statusText.textContent = isCreating
-    ? `Lobby creado. Comparte este código: ${roomCode}`
-    : `Conectado al lobby ${roomCode}.`;
-  menu.classList.add('hidden');
-  hud.classList.remove('hidden');
-  playing = true;
+  roomCode = $('roomCode').value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 24) || 'sala1';
+  joinBtn.disabled = true; statusText.textContent = 'Conectando…';
+  await connectRoom();
+  menu.classList.add('hidden'); hud.classList.remove('hidden'); playing = true;
   controls.getObject().position.set(0, standingHeight, 0);
-  upsertScore(playerId, playerName, kills);
   controls.lock();
+  upsertScore(playerId, playerName, kills);
   joinBtn.disabled = false;
-  createLobbyBtn.disabled = false;
-}
-
-createLobbyBtn.addEventListener('click', () => enterLobby(true));
-joinBtn.addEventListener('click', () => enterLobby(false));
+});
 $('leaveBtn').addEventListener('click', async () => {
   playing = false; controls.unlock(); menu.classList.remove('hidden'); hud.classList.add('hidden');
   if (channel && supabase) { await supabase.removeChannel(channel); channel = null; }
