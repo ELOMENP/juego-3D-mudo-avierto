@@ -5,61 +5,35 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ciudad Abierta 3D</title>
-  <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <section id="menu" class="panel">
-    <h1>CIUDAD ABIERTA <span>3D</span></h1>
-    <p>Explora la ciudad y juega con tus amigos.</p>
+  <div id="menu">
+    <h1>Ciudad Abierta 3D</h1>
 
     <label for="playerName">Nombre del jugador</label>
-    <input id="playerName" maxlength="18" placeholder="Escribe tu nombre">
+    <input id="playerName" placeholder="Tu nombre" maxlength="20">
 
     <label for="roomCode">Código de sala</label>
-    <input id="roomCode" maxlength="20" placeholder="Ejemplo: AMIGOS123">
+    <input id="roomCode" placeholder="Ej. ciudad123" maxlength="30">
 
-    <button id="joinButton">Entrar a la sala</button>
-    <button id="createButton" class="secondary">Crear sala nueva</button>
-    <p id="menuStatus">Escribe tu nombre para comenzar.</p>
-  </section>
+    <button id="joinBtn">Entrar a la ciudad</button>
+    <p id="status">Listo para jugar</p>
+  </div>
 
-  <section id="game" hidden>
-    <header id="hud">
-      <div>
-        <strong>CIUDAD ABIERTA 3D</strong>
-        <p>Sala: <span id="currentRoom">---</span></p>
-        <p>Jugadores: <span id="playerCount">1</span>/10</p>
-      </div>
+  <div id="hud">
+    <div id="health">Vida: 100</div>
+    <div id="weapon">Arma: Pistola</div>
+    <div id="ammo">Munición: 12</div>
+    <div id="controls">
+      WASD: moverse | Shift: correr | Espacio: saltar<br>
+      Mouse: mirar | 1/2: armas | Clic: disparar<br>
+      R: recargar | º: liberar ratón | Esc: liberar ratón
+    </div>
+    <button id="releaseBtn">Liberar ratón (º)</button>
+    <button id="leaveBtn">Salir de la sala</button>
+  </div>
 
-      <div id="healthPanel">
-        <p>VIDA: <span id="healthText">100 / 100</span></p>
-        <div class="healthBackground">
-          <div id="healthFill"></div>
-        </div>
-        <p id="weaponText">Pistola: 12 / 12</p>
-      </div>
-
-      <button id="inviteButton">Invitar</button>
-      <button id="leaveButton" class="danger">Salir</button>
-    </header>
-
-    <div id="crosshair">+</div>
-
-    <aside id="controls">
-      <strong>CONTROLES</strong>
-      <p>W A S D: moverse</p>
-      <p>Ratón: mirar</p>
-      <p>Clic izquierdo: disparar</p>
-      <p>R: recargar</p>
-      <p>1: pistola</p>
-      <p>2: rifle</p>
-      <p>Shift: correr</p>
-      <p>Esc: liberar ratón</p>
-    </aside>
-
-    <div id="notice">Haz clic en la ciudad para jugar.</div>
-  </section>
-
-  <script type="module" src="./game.js"></script>
+  <script type="module" src="game.js"></script>
 </body>
 </html>
