@@ -1,1621 +1,1517 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
-/* =========================================
+/* =========================================================
    CONFIGURACIÓN
-========================================= */
+========================================================= */
 
 const SUPABASE_URL = "https://vlwfntwxbzmeodutbrxd.supabase.co";
 const SUPABASE_KEY = "sb_publishable_JKRwt7biD2Y9wCQpQC9iQA_-EDPL17V";
 
 const ROOM_NAME = "ciudad-publica-v1";
-const MAX_PLAYERS = 10;
-const DOWN_TIME = 30;
-const REVIVE_TIME = 4;
-const PLAYER_MAX_HEALTH = 100;
+const MAX_HEALTH = 100;
+const REVIVE_HEALTH = 50;
+const DOWNED_SECONDS = 30;
+const REVIVE_SECONDS = 4;
+const MAX_NPCS = 12;
+const MEDKIT_HEAL = 35;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-const myId = crypto.randomUUID();
+
+/* =========================================================
+   ELEMENTOS DE INTERFAZ
+========================================================= */
 
 const $ = (id) => document.getElementById(id);
 
 const menu = $("menu");
+const gameUI = $("game");
+const usernameInput = $("username");
 const playButton = $("playButton");
-const playerNameInput = $("playerName");
-const menuError = $("menuError");
-const hud = $("hud");
-const healthFill = $("healthFill");
+const menuMessage = $("menuMessage");
+
 const healthText = $("healthText");
-const playerCountText = $("playerCount");
-const killCountText = $("killCount");
-const statusText = $("statusText");
+const healthBar = $("healthBar");
+const killsText = $("killsText");
+const playersText = $("playersText");
+const leaderRows = $("leaderRows");
 const crosshair = $("crosshair");
-const hitMarker = $("hitMarker");
 const notice = $("notice");
-const downScreen = $("downScreen");
+const pickupHint = $("pickupHint");
+const downedPanel = $("downedPanel");
 const downTimer = $("downTimer");
-const downTimerFill = $("downTimerFill");
-const reviveStatus = $("reviveStatus");
-const eliminatedScreen = $("eliminatedScreen");
-const settingsMenu = $("settingsMenu");
+const deadPanel = $("deadPanel");
+const respawnButton = $("respawnButton");
+const settings = $("settings");
 
-let playerName = "Jugador";
+let noticeTimeout;
+let noticeText = "";
+
+function showNotice(text, duration = 1800) {
+  noticeText = text;
+  notice.textContent = text;
+  notice.classList.add("visible");
+
+  clearTimeout(noticeTimeout);
+  noticeTimeout = setTimeout(() => {
+    notice.classList.remove("visible");
+  }, duration);
+}
+
+/* =========================================================
+   ESTADO DEL JUGADOR Y MULTIJUGADOR
+========================================================= */
+
+const clientId = crypto.randomUUID();
+
+let username = "";
 let channel = null;
-let connected = false;
+let joined = false;
+let playerHealth = MAX_HEALTH;
+let playerKills = 0;
+let playerDowned = false;
+let playerDead = false;
+let downedUntil = 0;
+let lastStateBroadcast = 0;
+let lastLeaderboardBroadcast = 0;
+let lastShootTime = 0;
+let lastDamageTime = 0;
+let reviveTargetId = null;
+let reviveStartTime = 0;
+let currentReviveTarget = null;
+let isAiming = false;
+let isCrouching = false;
+let isSprinting = false;
 let gameStarted = false;
-let settingsOpen = false;
 
-let mouseSensitivity = 0.0022;
-let normalFov = 75;
+const remotePlayers = new Map();
+const leaderboardPlayers = new Map();
+const keys = new Set();
+
+let mouseSensitivity = 0.002;
+let cameraFov = 80;
 let graphicsQuality = "medium";
-let showCrosshair = true;
 
-let lastBroadcast = 0;
-let lastShot = 0;
-let lastNoticeTimer = null;
-let hitMarkerTimer = null;
-
-const keys = Object.create(null);
-let leftMouse = false;
-let rightMouse = false;
-
-const player = {
-  position: new THREE.Vector3(0, 1.7, 6),
-  velocity: new THREE.Vector3(),
-  yaw: 0,
-  pitch: 0,
-  health: PLAYER_MAX_HEALTH,
-  kills: 0,
-  alive: true,
-  downed: false,
-  eliminated: false,
-  downDeadline: 0,
-  crouched: false,
-  sliding: false,
-  aiming: false,
-  grounded: true,
-  slideTimer: 0,
-  reviveTargetId: null,
-  reviveProgress: 0,
-  revivedById: null
-};
-
-/* =========================================
-   ESCENA
-========================================= */
+/* =========================================================
+   THREE.JS: ESCENA Y CÁMARA
+========================================================= */
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x91c8e5);
-scene.fog = new THREE.Fog(0x91c8e5, 80, 250);
+scene.background = new THREE.Color(0x9cb9cc);
+scene.fog = new THREE.Fog(0x9cb9cc, 50, 240);
 
 const camera = new THREE.PerspectiveCamera(
-  normalFov,
+  cameraFov,
   window.innerWidth / window.innerHeight,
   0.1,
-  500
+  600
 );
 
 camera.rotation.order = "YXZ";
-scene.add(camera);
+camera.position.set(0, 1.7, 0);
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({
+  antialias: true,
+  powerPreference: "high-performance"
+});
+
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
 
-renderer.domElement.style.position = "fixed";
-renderer.domElement.style.inset = "0";
-renderer.domElement.style.zIndex = "0";
-document.body.prepend(renderer.domElement);
+const hemiLight = new THREE.HemisphereLight(0xddeeff, 0x62605a, 2.0);
+scene.add(hemiLight);
 
-/* =========================================
-   ILUMINACIÓN
-========================================= */
+const sun = new THREE.DirectionalLight(0xfff2d6, 2.2);
+sun.position.set(60, 100, 30);
+sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024);
+scene.add(sun);
 
-scene.add(new THREE.HemisphereLight(0xdaf0ff, 0x52634d, 2));
-
-const sunlight = new THREE.DirectionalLight(0xffffff, 2);
-sunlight.position.set(-45, 85, 35);
-sunlight.castShadow = true;
-sunlight.shadow.mapSize.set(1024, 1024);
-sunlight.shadow.camera.left = -100;
-sunlight.shadow.camera.right = 100;
-sunlight.shadow.camera.top = 100;
-sunlight.shadow.camera.bottom = -100;
-scene.add(sunlight);
-
-/* =========================================
+/* =========================================================
    MATERIALES Y CIUDAD
-========================================= */
+========================================================= */
 
-const mat = {
-  ground: new THREE.MeshStandardMaterial({ color: 0x667765 }),
-  road: new THREE.MeshStandardMaterial({ color: 0x343b43 }),
-  sidewalk: new THREE.MeshStandardMaterial({ color: 0xa0a3a1 }),
+const materials = {
+  ground: new THREE.MeshStandardMaterial({ color: 0x59665d }),
+  road: new THREE.MeshStandardMaterial({ color: 0x30373d }),
+  sidewalk: new THREE.MeshStandardMaterial({ color: 0x999b95 }),
   building: [
-    new THREE.MeshStandardMaterial({ color: 0x9aa7ad }),
-    new THREE.MeshStandardMaterial({ color: 0xc1b5a1 }),
-    new THREE.MeshStandardMaterial({ color: 0x777e88 })
+    new THREE.MeshStandardMaterial({ color: 0x929da5 }),
+    new THREE.MeshStandardMaterial({ color: 0xb6a795 }),
+    new THREE.MeshStandardMaterial({ color: 0x727e8a }),
+    new THREE.MeshStandardMaterial({ color: 0xc0c4bd }),
+    new THREE.MeshStandardMaterial({ color: 0x8b9690 })
   ],
   window: new THREE.MeshStandardMaterial({
-    color: 0x6db6d6,
-    emissive: 0x183849,
-    roughness: 0.3
+    color: 0x7fc4db,
+    emissive: 0x1b5367,
+    emissiveIntensity: 0.3
   }),
-  line: new THREE.MeshStandardMaterial({ color: 0xf1f1e8 })
+  npc: new THREE.MeshStandardMaterial({ color: 0xb73e34 }),
+  npcHead: new THREE.MeshStandardMaterial({ color: 0xd5a17f }),
+  medkit: new THREE.MeshStandardMaterial({
+    color: 0x31e77d,
+    emissive: 0x0d7734,
+    emissiveIntensity: 0.6
+  })
 };
 
-const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(260, 260),
-  mat.ground
-);
-ground.rotation.x = -Math.PI / 2;
-ground.receiveShadow = true;
-scene.add(ground);
-
-const buildings = [];
-
-function box(parent, w, h, d, x, y, z, material) {
+function addBox(parent, w, h, d, material, x, y, z, castShadow = true) {
   const mesh = new THREE.Mesh(
     new THREE.BoxGeometry(w, h, d),
     material
   );
+
   mesh.position.set(x, y, z);
-  mesh.castShadow = true;
+  mesh.castShadow = castShadow;
   mesh.receiveShadow = true;
   parent.add(mesh);
   return mesh;
 }
 
-function createBuilding(x, z, w, d, h, material) {
-  const mesh = box(scene, w, h, d, x, h / 2, z, material);
-
-  buildings.push({
-    x,
-    z,
-    halfX: w / 2,
-    halfZ: d / 2
-  });
-
-  const floors = Math.floor(h / 3.2);
-
-  for (let floor = 0; floor < floors; floor++) {
-    const y = 1.8 + floor * 3.2;
-    if (y > h - 0.6) continue;
-
-    for (let i = 0; i < Math.floor(w / 2.6); i++) {
-      const wx = x - w / 2 + 1.3 + i * 2.6;
-
-      box(scene, 0.9, 1.1, 0.06, wx, y, z + d / 2 + 0.04, mat.window);
-      box(scene, 0.9, 1.1, 0.06, wx, y, z - d / 2 - 0.04, mat.window);
-    }
-
-    for (let i = 0; i < Math.floor(d / 2.6); i++) {
-      const wz = z - d / 2 + 1.3 + i * 2.6;
-
-      box(scene, 0.06, 1.1, 0.9, x + w / 2 + 0.04, y, wz, mat.window);
-      box(scene, 0.06, 1.1, 0.9, x - w / 2 - 0.04, y, wz, mat.window);
-    }
-  }
-
-  return mesh;
-}
-
-function road(x, z, w, d) {
-  box(scene, w, 0.08, d, x, 0.02, z, mat.road);
-}
+const ground = addBox(
+  scene, 500, 1, 500, materials.ground,
+  0, -0.55, 0, false
+);
 
 function createCity() {
-  road(0, 0, 260, 16);
-  road(0, 0, 16, 260);
-  road(0, 42, 260, 12);
-  road(0, -42, 260, 12);
-  road(42, 0, 12, 260);
-  road(-42, 0, 12, 260);
-  road(0, 82, 260, 10);
-  road(0, -82, 260, 10);
-  road(82, 0, 10, 260);
-  road(-82, 0, 10, 260);
+  // Calles principales
+  addBox(scene, 16, 0.08, 420, materials.road, 0, 0, 0, false);
+  addBox(scene, 420, 0.08, 16, materials.road, 0, 0, 0, false);
 
-  for (let x = -110; x <= 110; x += 28) {
-    for (let z = -110; z <= 110; z += 28) {
-      if (Math.abs(x) < 13 || Math.abs(z) < 13) continue;
-      if (Math.abs(Math.abs(x) - 42) < 7) continue;
-      if (Math.abs(Math.abs(z) - 42) < 7) continue;
+  // Calles secundarias
+  for (let p = -180; p <= 180; p += 60) {
+    addBox(scene, 10, 0.08, 420, materials.road, p, 0, 0, false);
+    addBox(scene, 420, 0.08, 10, materials.road, 0, 0, p, false);
+  }
 
-      const w = 10 + Math.random() * 5;
-      const d = 10 + Math.random() * 5;
-      const h = 8 + Math.random() * 23;
-      const material = mat.building[
-        Math.floor(Math.random() * mat.building.length)
+  // Líneas de las calles
+  const lineMat = new THREE.MeshStandardMaterial({ color: 0xe7d58c });
+
+  for (let z = -200; z <= 200; z += 10) {
+    addBox(scene, 0.18, 0.02, 4, lineMat, 0, 0.06, z, false);
+  }
+
+  for (let x = -200; x <= 200; x += 10) {
+    addBox(scene, 4, 0.02, 0.18, lineMat, x, 0.06, 0, false);
+  }
+
+  // Edificios distribuidos en manzanas
+  for (let x = -180; x <= 180; x += 30) {
+    for (let z = -180; z <= 180; z += 30) {
+      if (Math.abs(x) < 16 || Math.abs(z) < 16) continue;
+
+      if (Math.random() < 0.12) continue;
+
+      const w = 12 + Math.random() * 8;
+      const d = 12 + Math.random() * 8;
+      const h = 9 + Math.random() * 35;
+      const mat = materials.building[
+        Math.floor(Math.random() * materials.building.length)
       ];
 
-      createBuilding(
-        x + (Math.random() - 0.5) * 4,
-        z + (Math.random() - 0.5) * 4,
-        w, d, h, material
-      );
+      const bx = x + (Math.random() - 0.5) * 5;
+      const bz = z + (Math.random() - 0.5) * 5;
+
+      addBox(scene, w, h, d, mat, bx, h / 2, bz);
+
+      // Ventanas en las fachadas
+      const floors = Math.max(2, Math.floor(h / 4));
+
+      for (let floor = 1; floor < floors; floor++) {
+        for (let side = -1; side <= 1; side += 2) {
+          addBox(
+            scene, 1.5, 1.2, 0.12,
+            materials.window,
+            bx + side * (w / 2 + 0.07),
+            floor * 4,
+            bz
+          );
+
+          addBox(
+            scene, 0.12, 1.2, 1.5,
+            materials.window,
+            bx,
+            floor * 4,
+            bz + side * (d / 2 + 0.07)
+          );
+        }
+      }
     }
   }
 
-  for (let i = -120; i <= 120; i += 8) {
-    box(scene, 0.15, 0.025, 3, i, 0.075, 0, mat.line);
+  // Farolas
+  const poleMat = new THREE.MeshStandardMaterial({ color: 0x353b3f });
+  const lampMat = new THREE.MeshStandardMaterial({
+    color: 0xffedbb,
+    emissive: 0xffd27b,
+    emissiveIntensity: 0.7
+  });
+
+  for (let p = -180; p <= 180; p += 30) {
+    for (const side of [-1, 1]) {
+      const x = side * 10;
+      const z = p;
+
+      addBox(scene, 0.2, 5, 0.2, poleMat, x, 2.5, z);
+      addBox(scene, 1.1, 0.25, 0.6, lampMat, x, 5.1, z, false);
+    }
   }
 }
 
 createCity();
 
-function blocked(x, z, radius = 0.5) {
-  return buildings.some((b) =>
-    Math.abs(x - b.x) < b.halfX + radius &&
-    Math.abs(z - b.z) < b.halfZ + radius
-  );
+/* =========================================================
+   ARMA Y MANOS VISIBLES
+========================================================= */
+
+const weaponGroup = new THREE.Group();
+camera.add(weaponGroup);
+scene.add(camera);
+
+const skinMat = new THREE.MeshStandardMaterial({ color: 0xb98463 });
+const sleeveMat = new THREE.MeshStandardMaterial({ color: 0x273e4b });
+const gunMat = new THREE.MeshStandardMaterial({ color: 0x20252a });
+const gunAccentMat = new THREE.MeshStandardMaterial({ color: 0x525d65 });
+
+function createWeapon() {
+  weaponGroup.clear();
+
+  // Brazo
+  addBox(weaponGroup, 0.17, 0.18, 0.48, sleeveMat, -0.28, -0.3, -0.45);
+  addBox(weaponGroup, 0.14, 0.13, 0.23, skinMat, -0.28, -0.26, -0.68);
+
+  // Mano de apoyo
+  addBox(weaponGroup, 0.14, 0.13, 0.28, skinMat, 0.08, -0.33, -0.58);
+
+  // Cuerpo del arma
+  addBox(weaponGroup, 0.22, 0.17, 0.48, gunMat, 0, -0.22, -0.58);
+
+  // Cañón
+  addBox(weaponGroup, 0.09, 0.09, 0.48, gunAccentMat, 0, -0.19, -1.0);
+
+  // Empuñadura
+  addBox(weaponGroup, 0.12, 0.23, 0.13, gunMat, 0, -0.39, -0.48);
+
+  // Mira
+  addBox(weaponGroup, 0.05, 0.04, 0.12, gunAccentMat, 0, -0.12, -0.75);
+
+  weaponGroup.position.set(0.32, -0.31, -0.45);
 }
 
-/* =========================================
-   ARMA Y MANOS EN PRIMERA PERSONA
-========================================= */
+createWeapon();
 
-const weapon = new THREE.Group();
-camera.add(weapon);
+/* =========================================================
+   NPC Y BOTIQUINES
+========================================================= */
 
-const skin = new THREE.MeshStandardMaterial({ color: 0xb97e59 });
-const sleeve = new THREE.MeshStandardMaterial({ color: 0x273b4a });
-const glove = new THREE.MeshStandardMaterial({ color: 0x252b30 });
-const gun = new THREE.MeshStandardMaterial({
-  color: 0x303943,
-  metalness: 0.7,
-  roughness: 0.3
-});
-const gunDark = new THREE.MeshStandardMaterial({
-  color: 0x12171c,
-  metalness: 0.4,
-  roughness: 0.4
-});
-const gunBlue = new THREE.MeshStandardMaterial({
-  color: 0x40bde0,
-  metalness: 0.4
-});
-
-function wbox(w, h, d, x, y, z, material, rz = 0) {
-  const mesh = box(weapon, w, h, d, x, y, z, material);
-  mesh.rotation.z = rz;
-  mesh.castShadow = false;
-  return mesh;
-}
-
-function wcylinder(radius, length, x, y, z, material) {
-  const mesh = new THREE.Mesh(
-    new THREE.CylinderGeometry(radius, radius, length, 12),
-    material
-  );
-  mesh.rotation.x = Math.PI / 2;
-  mesh.position.set(x, y, z);
-  weapon.add(mesh);
-  return mesh;
-}
-
-wbox(0.22, 0.24, 0.72, -0.34, -0.48, -0.36, sleeve, -0.18);
-wbox(0.22, 0.24, 0.72, 0.34, -0.43, -0.40, sleeve, 0.18);
-
-wbox(0.19, 0.15, 0.24, -0.24, -0.37, -0.69, skin);
-wbox(0.19, 0.15, 0.24, 0.25, -0.32, -0.70, skin);
-
-wbox(0.20, 0.12, 0.20, -0.24, -0.39, -0.77, glove);
-wbox(0.20, 0.12, 0.20, 0.25, -0.34, -0.78, glove);
-
-wbox(0.16, 0.18, 0.65, 0.16, -0.28, -0.91, gun);
-wcylinder(0.035, 0.55, 0.16, -0.25, -1.43, gunDark);
-wcylinder(0.045, 0.08, 0.16, -0.25, -1.72, gun);
-
-wbox(0.12, 0.16, 0.35, 0.16, -0.29, -0.43, gunDark);
-wbox(0.11, 0.25, 0.13, 0.16, -0.46, -0.72, gunDark, -0.15);
-wbox(0.11, 0.27, 0.16, 0.16, -0.49, -0.99, gunDark, -0.06);
-wbox(0.08, 0.09, 0.13, 0.16, -0.15, -0.83, gunDark);
-wbox(0.055, 0.025, 0.06, 0.16, -0.095, -0.84, gunBlue);
-wbox(0.19, 0.14, 0.28, 0.16, -0.27, -1.15, gunDark);
-
-weapon.position.set(0.02, -0.03, 0);
-
-let weaponTime = 0;
-let recoil = 0;
-
-function animateWeapon(delta) {
-  weaponTime += delta;
-
-  const moving = keys.KeyW || keys.KeyA || keys.KeyS || keys.KeyD;
-  const running = keys.ShiftLeft || keys.ShiftRight;
-  const bob = moving ? (running ? 0.035 : 0.018) : 0.003;
-
-  const xBob = Math.sin(weaponTime * 8) * bob;
-  const yBob = Math.abs(Math.cos(weaponTime * 8)) * bob;
-
-  const targetX = player.aiming ? -0.16 : 0.02;
-  const targetY = player.aiming ? -0.13 : -0.03;
-  const targetZ = player.aiming ? -0.06 : 0;
-
-  weapon.position.x = THREE.MathUtils.lerp(weapon.position.x, targetX + xBob, 0.15);
-  weapon.position.y = THREE.MathUtils.lerp(weapon.position.y, targetY + yBob + recoil, 0.18);
-  weapon.position.z = THREE.MathUtils.lerp(weapon.position.z, targetZ, 0.15);
-
-  weapon.rotation.z = THREE.MathUtils.lerp(
-    weapon.rotation.z,
-    player.sliding ? -0.12 : 0,
-    0.15
-  );
-
-  recoil = THREE.MathUtils.lerp(recoil, 0, Math.min(1, delta * 12));
-}
-
-/* =========================================
-   MODELOS DE PERSONAJES
-========================================= */
-
-const remotePlayers = new Map();
 const npcs = [];
+const medkits = [];
+let npcIdCounter = 0;
 
-function createCharacter(name, color, isNPC = false) {
+function createNPC() {
   const group = new THREE.Group();
 
-  const bodyMat = new THREE.MeshStandardMaterial({ color });
-  const skinMat = new THREE.MeshStandardMaterial({ color: 0xe0b28e });
-
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.85, 0.38), bodyMat);
-  body.position.y = 1.05;
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(0.7, 1.15, 0.45),
+    materials.npc
+  );
+  body.position.y = 0.9;
+  body.castShadow = true;
   group.add(body);
 
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.23, 14, 12), skinMat);
-  head.position.y = 1.68;
+  const head = new THREE.Mesh(
+    new THREE.SphereGeometry(0.28, 12, 10),
+    materials.npcHead
+  );
+  head.position.y = 1.65;
+  head.castShadow = true;
   group.add(head);
 
-  const legs = [];
+  const legMat = new THREE.MeshStandardMaterial({ color: 0x303c48 });
 
-  for (const side of [-1, 1]) {
-    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.65, 0.28), bodyMat);
-    leg.position.set(side * 0.19, 0.33, 0);
-    group.add(leg);
-    legs.push(leg);
-  }
+  const legL = addBox(group, 0.22, 0.65, 0.25, legMat, -0.18, 0.32, 0);
+  const legR = addBox(group, 0.22, 0.65, 0.25, legMat, 0.18, 0.32, 0);
 
-  const canvas = document.createElement("canvas");
-  canvas.width = 256;
-  canvas.height = 64;
-
-  const ctx = canvas.getContext("2d");
-  ctx.fillStyle = "rgba(0,0,0,0.65)";
-  ctx.fillRect(10, 8, 236, 48);
-  ctx.font = "bold 25px Arial";
-  ctx.textAlign = "center";
-  ctx.fillStyle = "white";
-  ctx.fillText(name.slice(0, 16), 128, 40);
-
-  const sprite = new THREE.Sprite(
-    new THREE.SpriteMaterial({
-      map: new THREE.CanvasTexture(canvas),
-      transparent: true,
-      depthTest: false
-    })
-  );
-
-  sprite.position.y = 2.35;
-  sprite.scale.set(2.4, 0.6, 1);
-  group.add(sprite);
-
-  group.userData = {
-    name,
-    isNPC,
-    body,
-    head,
-    legs,
-    health: 100,
-    alive: true,
-    downed: false,
-    eliminated: false,
-    downDeadline: 0,
-    reviveProgress: 0,
-    reviveTargetId: null,
-    lastAttack: 0
-  };
-
-  return group;
-}
-
-/* =========================================
-   NPC
-========================================= */
-
-function spawnNPC(i) {
-  const colors = [0xc64e3d, 0x3f78b5, 0x5d9a66, 0xb2a04d];
-  const npc = createCharacter("NPC " + (i + 1), colors[i % colors.length], true);
-
-  let x = 0;
-  let z = 0;
-  let tries = 0;
+  let x, z;
 
   do {
-    x = (Math.random() - 0.5) * 180;
-    z = (Math.random() - 0.5) * 180;
-    tries++;
-  } while ((blocked(x, z) || Math.hypot(x, z) < 18) && tries < 100);
+    x = (Math.random() - 0.5) * 330;
+    z = (Math.random() - 0.5) * 330;
+  } while (Math.abs(x) < 18 && Math.abs(z) < 18);
 
-  npc.position.set(x, 0, z);
-  npc.userData.direction = Math.random() * Math.PI * 2;
-  npc.userData.moveTimer = 1 + Math.random() * 3;
-  npc.userData.spawnX = x;
-  npc.userData.spawnZ = z;
+  group.position.set(x, 0, z);
+  scene.add(group);
 
-  scene.add(npc);
+  const npc = {
+    id: `npc-${++npcIdCounter}`,
+    group,
+    hp: 100,
+    alive: true,
+    nextMove: 0,
+    moveTarget: new THREE.Vector3(x, 0, z),
+    speed: 1.5 + Math.random() * 1.2,
+    head,
+    body,
+    legL,
+    legR
+  };
+
   npcs.push(npc);
+  return npc;
 }
 
-for (let i = 0; i < 12; i++) spawnNPC(i);
-
-/* =========================================
-   AVISOS Y HUD
-========================================= */
-
-function showNotice(message) {
-  notice.textContent = message;
-  notice.style.opacity = "1";
-  clearTimeout(lastNoticeTimer);
-
-  lastNoticeTimer = setTimeout(() => {
-    notice.style.opacity = "0";
-  }, 1800);
+function spawnNPCs() {
+  while (npcs.filter(n => n.alive).length < MAX_NPCS) {
+    createNPC();
+  }
 }
 
-function showHit() {
-  hitMarker.style.display = "block";
-  clearTimeout(hitMarkerTimer);
+function createMedkit(position) {
+  const group = new THREE.Group();
 
-  hitMarkerTimer = setTimeout(() => {
-    hitMarker.style.display = "none";
-  }, 120);
+  const boxMat = new THREE.MeshStandardMaterial({
+    color: 0xf0f0f0,
+    emissive: 0x222222
+  });
+
+  addBox(group, 0.65, 0.45, 0.55, boxMat, 0, 0.25, 0, false);
+  addBox(group, 0.14, 0.48, 0.08, materials.medkit, 0, 0.25, -0.29, false);
+  addBox(group, 0.42, 0.14, 0.08, materials.medkit, 0, 0.25, -0.29, false);
+
+  group.position.copy(position);
+  group.position.y = 0.05;
+  scene.add(group);
+
+  medkits.push({
+    group,
+    createdAt: performance.now(),
+    expiresAt: performance.now() + 90000
+  });
 }
+
+function killNPC(npc, killerId) {
+  if (!npc || !npc.alive) return;
+
+  npc.alive = false;
+  scene.remove(npc.group);
+
+  // El botiquín es visible para los jugadores de esta instancia.
+  // La sincronización de los botiquines entre clientes se puede añadir
+  // como evento de servidor si se necesita un mundo totalmente autoritativo.
+  if (Math.random() < 0.8) {
+    createMedkit(npc.group.position.clone());
+  }
+
+  if (killerId === clientId) {
+    showNotice("NPC eliminado");
+  }
+
+  setTimeout(() => {
+    const index = npcs.indexOf(npc);
+    if (index !== -1) npcs.splice(index, 1);
+    createNPC();
+  }, 8000);
+}
+
+spawnNPCs();
+
+/* =========================================================
+   JUGADOR LOCAL Y MOVIMIENTO
+========================================================= */
+
+const playerPosition = new THREE.Vector3(0, 1.7, 0);
+const velocity = new THREE.Vector3();
+
+let yaw = 0;
+let pitch = 0;
+const raycaster = new THREE.Raycaster();
+raycaster.far = 150;
+
+function resetPlayerPosition() {
+  playerPosition.set(
+    (Math.random() - 0.5) * 12,
+    1.7,
+    (Math.random() - 0.5) * 12
+  );
+
+  yaw = 0;
+  pitch = 0;
+  camera.position.copy(playerPosition);
+  camera.rotation.set(pitch, yaw, 0, "YXZ");
+}
+
+resetPlayerPosition();
+
+function getHorizontalForward() {
+  return new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+}
+
+function getHorizontalRight() {
+  return new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+}
+
+function updateMovement(delta) {
+  if (playerDowned || playerDead || settings.classList.contains("hidden") === false) {
+    return;
+  }
+
+  const forward = getHorizontalForward();
+  const right = getHorizontalRight();
+  const direction = new THREE.Vector3();
+
+  if (keys.has("KeyW")) direction.add(forward);
+  if (keys.has("KeyS")) direction.sub(forward);
+  if (keys.has("KeyD")) direction.add(right);
+  if (keys.has("KeyA")) direction.sub(right);
+
+  if (direction.lengthSq() > 0) direction.normalize();
+
+  isSprinting = keys.has("ShiftLeft") || keys.has("ShiftRight");
+
+  const speed = isCrouching ? 2.2 : (isSprinting ? 10 : 6);
+
+  playerPosition.addScaledVector(direction, speed * delta);
+
+  // Límites del mapa
+  playerPosition.x = THREE.MathUtils.clamp(playerPosition.x, -230, 230);
+  playerPosition.z = THREE.MathUtils.clamp(playerPosition.z, -230, 230);
+
+  // Cámara más baja al agacharse
+  const targetY = isCrouching ? 1.0 : 1.7;
+  playerPosition.y = THREE.MathUtils.lerp(playerPosition.y, targetY, delta * 10);
+
+  camera.position.copy(playerPosition);
+  camera.rotation.set(pitch, yaw, 0, "YXZ");
+
+  // Balanceo del arma
+  const moving = direction.lengthSq() > 0;
+  const bob = moving ? Math.sin(performance.now() * 0.012) * 0.015 : 0;
+
+  weaponGroup.position.y = (isAiming ? -0.25 : -0.31) + bob;
+  weaponGroup.position.x = isAiming ? 0.05 : 0.32;
+  weaponGroup.scale.setScalar(isAiming ? 0.78 : 1);
+}
+
+/* =========================================================
+   JUGADORES REMOTOS
+========================================================= */
+
+function createRemoteAvatar(id, name) {
+  const group = new THREE.Group();
+
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x3578bc });
+  const headMat = new THREE.MeshStandardMaterial({ color: 0xd2a07c });
+
+  const body = addBox(group, 0.7, 1.15, 0.45, bodyMat, 0, 0.9, 0);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 10), headMat);
+  head.position.y = 1.65;
+  group.add(head);
+
+  addBox(group, 0.22, 0.65, 0.25, bodyMat, -0.18, 0.32, 0);
+  addBox(group, 0.22, 0.65, 0.25, bodyMat, 0.18, 0.32, 0);
+
+  const labelCanvas = document.createElement("canvas");
+  labelCanvas.width = 512;
+  labelCanvas.height = 96;
+
+  const ctx = labelCanvas.getContext("2d");
+  ctx.fillStyle = "rgba(0,0,0,0.65)";
+  ctx.fillRect(0, 0, 512, 96);
+  ctx.fillStyle = "white";
+  ctx.font = "bold 36px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText(name.slice(0, 18), 256, 62);
+
+  const texture = new THREE.CanvasTexture(labelCanvas);
+  const label = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: texture, transparent: true })
+  );
+
+  label.scale.set(3, 0.56, 1);
+  label.position.y = 2.35;
+  group.add(label);
+
+  scene.add(group);
+
+  return {
+    id,
+    name,
+    group,
+    body,
+    hp: MAX_HEALTH,
+    kills: 0,
+    downed: false,
+    dead: false,
+    deadline: 0,
+    targetPosition: new THREE.Vector3(),
+    targetYaw: 0,
+    lastSeen: performance.now()
+  };
+}
+
+function removeRemotePlayer(id) {
+  const remote = remotePlayers.get(id);
+  if (remote) {
+    scene.remove(remote.group);
+    remotePlayers.delete(id);
+  }
+
+  leaderboardPlayers.delete(id);
+  updateLeaderboard();
+}
+
+function updateRemotePlayers(delta) {
+  for (const remote of remotePlayers.values()) {
+    if (remote.dead) {
+      remote.group.visible = false;
+      continue;
+    }
+
+    remote.group.visible = true;
+
+    remote.group.position.lerp(remote.targetPosition, Math.min(1, delta * 12));
+    remote.group.rotation.y = THREE.MathUtils.lerp(
+      remote.group.rotation.y,
+      remote.targetYaw,
+      Math.min(1, delta * 10)
+    );
+
+    if (remote.downed) {
+      remote.group.rotation.z = THREE.MathUtils.lerp(
+        remote.group.rotation.z, -Math.PI / 2, delta * 6
+      );
+    } else {
+      remote.group.rotation.z = THREE.MathUtils.lerp(
+        remote.group.rotation.z, 0, delta * 6
+      );
+    }
+  }
+}
+
+/* =========================================================
+   HUD Y TABLA TOP 3
+========================================================= */
 
 function updateHUD() {
-  const hp = Math.ceil(Math.max(0, player.health));
-
-  healthText.textContent = `${hp} / ${PLAYER_MAX_HEALTH}`;
-  healthFill.style.width = `${hp}%`;
-
-  healthFill.style.background =
-    hp > 60 ? "#48e58c" :
-    hp > 30 ? "#ffd04a" : "#ff4545";
-
-  killCountText.textContent = `Bajas: ${player.kills}`;
-
-  if (player.eliminated) statusText.textContent = "ELIMINADO";
-  else if (player.downed) statusText.textContent = "DERRIBADO";
-  else if (player.sliding) statusText.textContent = "DESLIZÁNDOTE";
-  else if (player.crouched) statusText.textContent = "AGACHADO";
-  else if (player.aiming) statusText.textContent = "APUNTANDO";
-  else statusText.textContent = "LISTO PARA COMBATIR";
+  healthText.textContent = Math.max(0, Math.round(playerHealth));
+  healthBar.style.width = `${THREE.MathUtils.clamp(playerHealth, 0, 100)}%`;
+  killsText.textContent = playerKills;
+  playersText.textContent = remotePlayers.size + 1;
 }
 
-function updatePlayerCount() {
-  playerCountText.textContent =
-    `Jugadores: ${Math.min(MAX_PLAYERS, remotePlayers.size + 1)}/${MAX_PLAYERS}`;
+function collectLeaderboard() {
+  const all = [{
+    id: clientId,
+    name: username,
+    kills: playerKills
+  }];
+
+  for (const remote of remotePlayers.values()) {
+    if (!remote.dead) {
+      all.push({
+        id: remote.id,
+        name: remote.name,
+        kills: Math.max(0, remote.kills || 0)
+      });
+    }
+  }
+
+  all.sort((a, b) => {
+    if (b.kills !== a.kills) return b.kills - a.kills;
+    return a.name.localeCompare(b.name);
+  });
+
+  return all.slice(0, 3);
 }
 
-/* =========================================
-   MENSAJES MULTIJUGADOR
-========================================= */
+function updateLeaderboard() {
+  const top = collectLeaderboard();
+  const medals = ["🥇", "🥈", "🥉"];
 
-function send(event, payload = {}) {
-  if (!channel || !connected) return;
+  leaderRows.replaceChildren();
+
+  top.forEach((player, index) => {
+    const row = document.createElement("div");
+    row.className = "leader-row";
+
+    const rank = document.createElement("span");
+    rank.className = "leader-rank";
+    rank.textContent = medals[index];
+
+    const name = document.createElement("span");
+    name.className = "leader-name";
+    name.textContent = player.name + (player.id === clientId ? " (Tú)" : "");
+
+    const kills = document.createElement("span");
+    kills.className = "leader-kills";
+    kills.textContent = `${player.kills} K`;
+
+    row.append(rank, name, kills);
+    leaderRows.appendChild(row);
+  });
+}
+
+/* =========================================================
+   SUPABASE: EVENTOS EN TIEMPO REAL
+========================================================= */
+
+function sendEvent(type, payload = {}) {
+  if (!channel || !joined) return;
 
   channel.send({
     type: "broadcast",
-    event,
+    event: type,
     payload: {
-      id: myId,
-      name: playerName,
+      sender: clientId,
       ...payload
     }
-  }).catch((error) => console.warn("Error de red:", error));
+  });
 }
 
-function createRemote(data) {
-  if (remotePlayers.has(data.id)) return remotePlayers.get(data.id);
-  if (remotePlayers.size >= MAX_PLAYERS - 1) return null;
+function sendPlayerState() {
+  if (!joined || !channel || playerDead) return;
 
-  const avatar = createCharacter(data.name || "Jugador", 0x3d9bdb);
-  avatar.userData.remoteId = data.id;
-  avatar.userData.lastUpdate = performance.now();
-
-  scene.add(avatar);
-
-  const remote = {
-    id: data.id,
-    name: data.name || "Jugador",
-    avatar,
-    health: 100,
-    alive: true,
-    downed: false,
-    eliminated: false,
-    downDeadline: 0,
-    lastUpdate: performance.now(),
-    reviveProgress: 0,
-    reviveTargetId: null
-  };
-
-  remotePlayers.set(data.id, remote);
-  updatePlayerCount();
-  return remote;
+  sendEvent("state", {
+    name: username,
+    x: playerPosition.x,
+    y: playerPosition.y,
+    z: playerPosition.z,
+    yaw,
+    health: playerHealth,
+    kills: playerKills,
+    downed: playerDowned,
+    dead: playerDead,
+    deadline: downedUntil
+  });
 }
 
-function setRemoteDowned(remote, deadline) {
+function publishScoreboard() {
+  sendEvent("scoreboard", {
+    name: username,
+    kills: playerKills,
+    dead: playerDead
+  });
+}
+
+function updateRemoteScore(id, name, kills, dead = false) {
+  if (id === clientId) return;
+
+  leaderboardPlayers.set(id, {
+    id,
+    name,
+    kills: Math.max(0, Number(kills) || 0),
+    dead
+  });
+
+  const remote = remotePlayers.get(id);
+  if (remote) {
+    remote.name = name || remote.name;
+    remote.kills = Math.max(0, Number(kills) || 0);
+    remote.dead = !!dead;
+  }
+
+  updateLeaderboard();
+}
+
+function handleState(payload) {
+  if (!payload || payload.sender === clientId) return;
+
+  let remote = remotePlayers.get(payload.sender);
+
+  if (!remote) {
+    remote = createRemoteAvatar(payload.sender, payload.name || "Jugador");
+    remotePlayers.set(payload.sender, remote);
+  }
+
+  remote.name = payload.name || remote.name;
+  remote.targetPosition.set(
+    Number(payload.x) || 0,
+    0,
+    Number(payload.z) || 0
+  );
+
+  remote.targetYaw = Number(payload.yaw) || 0;
+  remote.hp = Number.isFinite(payload.health) ? payload.health : remote.hp;
+  remote.kills = Math.max(0, Number(payload.kills) || 0);
+  remote.downed = !!payload.downed;
+  remote.dead = !!payload.dead;
+  remote.deadline = Number(payload.deadline) || 0;
+  remote.lastSeen = performance.now();
+
+  updateRemoteScore(
+    payload.sender,
+    remote.name,
+    remote.kills,
+    remote.dead
+  );
+}
+
+function handleRemoteHit(payload) {
+  if (!payload || payload.target !== clientId) return;
+
+  if (playerDowned) {
+    eliminatePlayer("Te remataron");
+    return;
+  }
+
+  if (playerDead) return;
+
+  damagePlayer(Number(payload.damage) || 20, payload.sender);
+}
+
+function handleRevive(payload) {
+  if (!payload || payload.target !== clientId) return;
+
+  // Solo el jugador derribado cambia su propio estado de vida.
+  if (playerDead || !playerDowned) return;
+
+  playerDowned = false;
+  playerHealth = REVIVE_HEALTH;
+  downedUntil = 0;
+  reviveTargetId = null;
+  currentReviveTarget = null;
+  reviveStartTime = 0;
+
+  downedPanel.classList.add("hidden");
+  camera.position.y = 1.7;
+  camera.rotation.z = 0;
+
+  showNotice(`${username}: ¡Has sido reanimado!`);
+  updateHUD();
+  sendPlayerState();
+  publishScoreboard();
+}
+
+function handleDowned(payload) {
+  if (!payload || payload.sender === clientId) return;
+
+  const remote = remotePlayers.get(payload.sender);
+  if (!remote) return;
+
   remote.downed = true;
-  remote.alive = false;
-  remote.eliminated = false;
-  remote.downDeadline = deadline || Date.now() + DOWN_TIME * 1000;
-  remote.health = 0;
-  remote.avatar.visible = true;
-  remote.avatar.rotation.z = -Math.PI / 2;
-  remote.avatar.position.y = 0.35;
+  remote.deadline = Number(payload.deadline) || 0;
 }
 
-function setRemoteEliminated(remote) {
-  remote.downed = false;
-  remote.alive = false;
-  remote.eliminated = true;
-  remote.health = 0;
-  remote.avatar.visible = false;
-  remote.reviveTargetId = null;
-}
+function handleEliminated(payload) {
+  if (!payload || payload.sender === clientId) return;
 
-function setRemoteRevived(remote, payload) {
-  remote.downed = false;
-  remote.alive = true;
-  remote.eliminated = false;
-  remote.health = PLAYER_MAX_HEALTH;
-  remote.reviveTargetId = null;
-  remote.avatar.rotation.z = 0;
-  remote.avatar.position.y = 0;
-  remote.avatar.visible = true;
-
-  if (Number.isFinite(payload.x) && Number.isFinite(payload.z)) {
-    remote.avatar.position.set(payload.x, 0, payload.z);
+  const remote = remotePlayers.get(payload.sender);
+  if (remote) {
+    remote.dead = true;
+    remote.downed = false;
+    remote.group.visible = false;
+    remote.kills = 0;
+    updateRemoteScore(remote.id, remote.name, 0, true);
   }
 }
 
-function handleMessage(event, p) {
-  if (!p || !p.id || p.id === myId) return;
-
-  if (event === "position") {
-    let r = remotePlayers.get(p.id);
-    if (!r) r = createRemote(p);
-    if (!r) return;
-
-    r.name = p.name || r.name;
-    r.lastUpdate = performance.now();
-
-    if (Number.isFinite(p.x) && Number.isFinite(p.z) && !r.downed && !r.eliminated) {
-      r.avatar.position.set(p.x, 0, p.z);
-      r.avatar.rotation.y = Number.isFinite(p.yaw) ? p.yaw : 0;
-    }
-
-    if (typeof p.crouched === "boolean" && !r.downed) {
-      r.avatar.scale.y = p.crouched ? 0.75 : 1;
-    }
-
-    if (p.health !== undefined && Number.isFinite(p.health)) {
-      r.health = THREE.MathUtils.clamp(p.health, 0, 100);
-    }
-  }
-
-  if (event === "downed") {
-    const r = remotePlayers.get(p.targetId);
-    if (r) setRemoteDowned(r, p.deadline);
-  }
-
-  if (event === "finish") {
-    const r = remotePlayers.get(p.targetId);
-    if (r) setRemoteEliminated(r);
-  }
-
-  if (event === "revived") {
-    const r = remotePlayers.get(p.targetId);
-    if (r) setRemoteRevived(r, p);
-  }
-
-  if (event === "respawn") {
-    const r = remotePlayers.get(p.id);
-    if (r) {
-      setRemoteRevived(r, p);
-      r.health = 100;
-    }
-  }
-
-  if (event === "hit") {
-    if (p.targetId === myId) {
-      receiveDamage(
-        Number(p.damage) || 0,
-        p.attackerName || "Jugador",
-        !!p.headshot,
-        !!p.finish
-      );
-    }
-  }
-
-  if (event === "reviveProgress") {
-    const r = remotePlayers.get(p.targetId);
-    if (r) r.reviveTargetId = p.reviverId || null;
-  }
-
-  if (event === "shot") {
-    if ([p.sx, p.sy, p.sz, p.ex, p.ey, p.ez].every(Number.isFinite)) {
-      createTracer(
-        new THREE.Vector3(p.sx, p.sy, p.sz),
-        new THREE.Vector3(p.ex, p.ey, p.ez),
-        0xffd36a
-      );
-    }
-  }
-}
-
-async function connectMultiplayer() {
+function setupChannel() {
   channel = supabase.channel(ROOM_NAME, {
     config: {
       broadcast: { self: false },
-      presence: { key: myId }
+      presence: { key: clientId }
     }
   });
 
-  for (const event of [
-    "position", "downed", "finish", "revived",
-    "respawn", "hit", "reviveProgress", "shot"
-  ]) {
-    channel.on("broadcast", { event }, ({ payload }) => {
-      handleMessage(event, payload);
-    });
-  }
+  channel
+    .on("broadcast", { event: "state" }, ({ payload }) => handleState(payload))
+    .on("broadcast", { event: "scoreboard" }, ({ payload }) => {
+      if (payload?.sender === clientId) return;
+      updateRemoteScore(
+        payload.sender,
+        payload.name || "Jugador",
+        payload.kills,
+        payload.dead
+      );
+    })
+    .on("broadcast", { event: "hit" }, ({ payload }) => handleRemoteHit(payload))
+    .on("broadcast", { event: "downed" }, ({ payload }) => handleDowned(payload))
+    .on("broadcast", { event: "revive" }, ({ payload }) => handleRevive(payload))
+    .on("broadcast", { event: "eliminated" }, ({ payload }) => handleEliminated(payload))
+    .on("broadcast", { event: "respawn" }, ({ payload }) => {
+      if (payload?.sender === clientId) return;
+      const remote = remotePlayers.get(payload.sender);
+      if (remote) {
+        remote.dead = false;
+        remote.downed = false;
+        remote.hp = MAX_HEALTH;
+        remote.kills = 0;
+        remote.group.visible = true;
+      }
+    })
+    .on("broadcast", { event: "npcKill" }, ({ payload }) => {
+      // Evento informativo: la autoridad del daño a NPC es local en esta versión.
+      if (payload?.sender !== clientId) {
+        // Evita duplicar NPC entre clientes por IDs locales.
+      }
+    })
+    .on("presence", { event: "sync" }, () => {
+      const state = channel.presenceState();
+      const ids = new Set();
 
-  channel.on("presence", { event: "sync" }, () => {
-    const count = Object.keys(channel.presenceState()).length;
+      for (const [key, entries] of Object.entries(state)) {
+        if (key === clientId) continue;
 
-    if (count > MAX_PLAYERS) {
-      showNotice("La sala puede superar el límite: hace falta control del servidor.");
-    }
-  });
+        const entry = entries?.[0];
+        if (!entry) continue;
 
-  await new Promise((resolve, reject) => {
-    const timeout = setTimeout(
-      () => reject(new Error("Tiempo agotado al conectar con Supabase.")),
-      12000
-    );
+        const id = entry.id || key;
+        ids.add(id);
 
-    channel.subscribe(async (status) => {
-      if (status === "SUBSCRIBED") {
-        clearTimeout(timeout);
-        connected = true;
-
-        try {
-          await channel.track({ id: myId, name: playerName });
-        } catch (e) {
-          console.warn("Presence:", e);
+        if (!remotePlayers.has(id)) {
+          const remote = createRemoteAvatar(id, entry.name || "Jugador");
+          remotePlayers.set(id, remote);
+          remote.targetPosition.set(0, 0, 0);
         }
 
-        resolve();
+        updateRemoteScore(
+          id,
+          entry.name || "Jugador",
+          entry.kills || 0,
+          false
+        );
       }
 
-      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-        clearTimeout(timeout);
-        reject(new Error("No se pudo conectar con Supabase Realtime."));
+      for (const id of remotePlayers.keys()) {
+        if (!ids.has(id)) removeRemotePlayer(id);
+      }
+
+      playersText.textContent = remotePlayers.size + 1;
+      updateLeaderboard();
+    })
+    .subscribe(async (status) => {
+      if (status === "SUBSCRIBED") {
+        joined = true;
+
+        await channel.track({
+          id: clientId,
+          name: username,
+          kills: playerKills,
+          online: true
+        });
+
+        sendPlayerState();
+        publishScoreboard();
+        showNotice("Conectado a la partida");
+      } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        showNotice("Error de conexión con la partida", 3000);
       }
     });
-  });
 }
 
-/* =========================================
-   DISPAROS Y PROYECTILES
-========================================= */
+/* =========================================================
+   REGISTRO: NOMBRE ÚNICO EN LA SESIÓN
+========================================================= */
 
-const raycaster = new THREE.Raycaster();
-raycaster.far = 120;
-
-const tracers = [];
-
-function createTracer(start, end, color = 0xffd36a) {
-  const geometry = new THREE.BufferGeometry().setFromPoints([start, end]);
-  const material = new THREE.LineBasicMaterial({
-    color,
-    transparent: true,
-    opacity: 0.95
-  });
-
-  const line = new THREE.Line(geometry, material);
-  line.userData.life = 0.1;
-  scene.add(line);
-  tracers.push(line);
+function normalizeName(name) {
+  return name.trim().normalize("NFKC").toLocaleLowerCase("es");
 }
 
-function updateTracers(delta) {
-  for (let i = tracers.length - 1; i >= 0; i--) {
-    const line = tracers[i];
-    line.userData.life -= delta;
-
-    if (line.userData.life <= 0) {
-      scene.remove(line);
-      line.geometry.dispose();
-      line.material.dispose();
-      tracers.splice(i, 1);
-    }
+async function checkNameAvailable(name) {
+  // La presencia permite detectar nombres ocupados en la sesión actual.
+  // Esta comprobación cliente no es una garantía contra carreras o trampas.
+  if (!channel) {
+    channel = supabase.channel(ROOM_NAME, {
+      config: { presence: { key: clientId } }
+    });
   }
-}
 
-function targetParts() {
-  const list = [];
+  const clean = normalizeName(name);
+  const state = channel.presenceState();
 
-  for (const npc of npcs) {
-    if (npc.userData.alive || npc.userData.downed) {
-      list.push(npc.userData.head, npc.userData.body);
+  for (const [key, entries] of Object.entries(state)) {
+    if (key === clientId) continue;
+
+    for (const entry of entries || []) {
+      if (normalizeName(entry.name || "") === clean) {
+        return false;
+      }
     }
   }
 
-  for (const r of remotePlayers.values()) {
-    if (r.avatar.visible && !r.eliminated) {
-      list.push(r.avatar.userData.head, r.avatar.userData.body);
-    }
-  }
-
-  return list;
+  return true;
 }
 
-function getOwner(object) {
-  for (const npc of npcs) {
-    if (object === npc.userData.head || object === npc.userData.body) {
-      return { type: "npc", target: npc };
-    }
+async function startGame() {
+  if (gameStarted) return;
+
+  const enteredName = usernameInput.value.trim();
+
+  if (enteredName.length < 3) {
+    menuMessage.textContent = "Tu nombre debe tener al menos 3 caracteres.";
+    return;
   }
 
-  for (const r of remotePlayers.values()) {
-    if (object === r.avatar.userData.head || object === r.avatar.userData.body) {
-      return { type: "remote", target: r };
-    }
+  if (!/^[\p{L}\p{N}_ -]+$/u.test(enteredName)) {
+    menuMessage.textContent = "Usa letras, números, espacios, guion o guion bajo.";
+    return;
   }
 
-  return null;
+  playButton.disabled = true;
+  menuMessage.textContent = "Conectando...";
+
+  try {
+    username = enteredName;
+
+    // Se conecta al canal antes de verificar para poder consultar presencia.
+    setupChannel();
+
+    await new Promise(resolve => setTimeout(resolve, 1200));
+
+    const available = await checkNameAvailable(username);
+
+    if (!available) {
+      if (channel) {
+        await supabase.removeChannel(channel);
+        channel = null;
+      }
+
+      joined = false;
+      menuMessage.textContent = "Ese nombre ya está en uso. Elige otro.";
+      playButton.disabled = false;
+      return;
+    }
+
+    gameStarted = true;
+    menu.classList.add("hidden");
+    gameUI.classList.remove("hidden");
+
+    resetPlayerPosition();
+    updateHUD();
+    updateLeaderboard();
+
+    renderer.domElement.requestPointerLock?.();
+  } catch (error) {
+    console.error(error);
+    menuMessage.textContent = "No se pudo conectar. Intenta de nuevo.";
+    playButton.disabled = false;
+  }
 }
+
+playButton.addEventListener("click", startGame);
+
+usernameInput.addEventListener("keydown", event => {
+  if (event.key === "Enter") startGame();
+});
+
+/* =========================================================
+   DISPAROS, RAYCAST Y DAÑO
+========================================================= */
 
 function shoot() {
-  if (
-    !gameStarted || settingsOpen ||
-    !player.alive || player.downed || player.eliminated ||
-    document.pointerLockElement !== renderer.domElement
-  ) return;
+  if (!gameStarted || playerDead || playerDowned) return;
 
   const now = performance.now();
-  if (now - lastShot < 160) return;
-  lastShot = now;
-  recoil = 0.09;
+  if (now - lastShootTime < 180) return;
+  lastShootTime = now;
 
-  camera.updateMatrixWorld(true);
+  weaponGroup.position.z = -0.4;
+  setTimeout(() => {
+    weaponGroup.position.z = -0.45;
+  }, 70);
 
-  const start = camera.position.clone();
-  const direction = new THREE.Vector3(0, 0, -1)
-    .applyQuaternion(camera.quaternion)
-    .normalize();
+  raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
 
-  raycaster.set(start, direction);
+  const npcMeshes = [];
 
-  const hits = raycaster.intersectObjects(targetParts(), false);
-  const end = hits.length
-    ? hits[0].point.clone()
-    : start.clone().add(direction.multiplyScalar(100));
+  for (const npc of npcs) {
+    if (!npc.alive) continue;
+    npcMeshes.push(npc.head, npc.body);
+  }
 
-  createTracer(start, end);
+  const remoteMeshes = [];
 
-  send("shot", {
-    sx: start.x, sy: start.y, sz: start.z,
-    ex: end.x, ey: end.y, ez: end.z
-  });
+  for (const remote of remotePlayers.values()) {
+    if (remote.dead) continue;
+    remote.group.traverse(obj => {
+      if (obj.isMesh) {
+        obj.userData.remoteId = remote.id;
+        remoteMeshes.push(obj);
+      }
+    });
+  }
+
+  const hits = raycaster.intersectObjects([...npcMeshes, ...remoteMeshes], false);
 
   if (!hits.length) return;
 
   const hit = hits[0];
-  const owner = getOwner(hit.object);
-  if (!owner) return;
+  const obj = hit.object;
 
-  const headshot = hit.object === owner.target.userData.head;
-  showHit();
+  if (obj.userData.remoteId) {
+    const targetId = obj.userData.remoteId;
+    const remote = remotePlayers.get(targetId);
 
-  if (owner.type === "npc") {
-    damageNPC(owner.target, headshot ? 100 : 34, headshot);
+    if (remote && !remote.dead) {
+      // El daño se comunica al cliente objetivo.
+      sendEvent("hit", {
+        target: targetId,
+        damage: 34
+      });
+
+      // Las kills de otros jugadores se registran cuando llega el evento
+      // de eliminación del objetivo. El cliente no puede garantizarlo por sí solo.
+      showNotice(`Impacto a ${remote.name}`);
+    }
+
     return;
   }
 
-  const target = owner.target;
+  const npc = npcs.find(n => n.alive && (n.head === obj || n.body === obj));
 
-  if (target.downed) {
-    // Un segundo impacto contra un jugador derribado lo remata.
-    send("hit", {
-      targetId: target.id,
-      damage: 100,
-      finish: true,
-      headshot,
-      attackerName: playerName
+  if (npc) {
+    const headshot = obj === npc.head;
+    npc.hp -= headshot ? 100 : 34;
+
+    if (npc.hp <= 0) {
+      killNPC(npc, clientId);
+      sendEvent("npcKill", { npcId: npc.id });
+    } else {
+      showNotice(headshot ? "Impacto en cabeza" : "Impacto");
+    }
+  }
+}
+
+function damagePlayer(damage, attackerId = null) {
+  if (playerDead || playerDowned) return;
+
+  playerHealth = Math.max(0, playerHealth - damage);
+  lastDamageTime = performance.now();
+  updateHUD();
+
+  if (playerHealth <= 0) {
+    playerDowned = true;
+    playerHealth = 0;
+    downedUntil = Date.now() + DOWNED_SECONDS * 1000;
+    downedPanel.classList.remove("hidden");
+
+    sendEvent("downed", {
+      deadline: downedUntil,
+      attacker: attackerId
     });
 
-    target.downed = false;
-    target.eliminated = true;
-    target.alive = false;
-    target.avatar.visible = false;
-
-    showNotice("¡REMATE!");
-    player.kills++;
-    updateHUD();
-
-    send("finish", { targetId: target.id, attackerId: myId });
-    return;
+    sendPlayerState();
+    showNotice("Estás derribado");
   }
+}
 
-  if (!target.alive || target.eliminated) return;
+function eliminatePlayer(reason = "Has sido eliminado") {
+  if (playerDead) return;
 
-  const damage = headshot ? 100 : 34;
+  playerDead = true;
+  playerDowned = false;
+  playerHealth = 0;
+  playerKills = 0;
+  downedUntil = 0;
 
-  send("hit", {
-    targetId: target.id,
-    damage,
-    headshot,
-    attackerName: playerName,
-    finish: false
+  downedPanel.classList.add("hidden");
+  deadPanel.classList.remove("hidden");
+
+  reviveTargetId = null;
+  currentReviveTarget = null;
+  reviveStartTime = 0;
+
+  sendEvent("eliminated", {
+    name: username,
+    kills: 0
   });
 
-  // Predicción visual del cliente atacante; el servidor debería validar el resultado.
-  target.health = Math.max(0, target.health - damage);
-
-  if (target.health <= 0) {
-    target.downed = true;
-    target.alive = false;
-    target.downDeadline = Date.now() + DOWN_TIME * 1000;
-    setRemoteDowned(target, target.downDeadline);
-
-    send("downed", {
-      targetId: target.id,
-      deadline: target.downDeadline,
-      attackerId: myId
-    });
-
-    showNotice("JUGADOR DERRIBADO");
-  } else {
-    showNotice(headshot ? "IMPACTO EN LA CABEZA" : "IMPACTO");
-  }
-}
-
-function damageNPC(npc, damage, headshot) {
-  if (!npc.userData.alive) return;
-
-  npc.userData.health -= damage;
-
-  if (headshot) showNotice("¡DISPARO A LA CABEZA!");
-
-  if (npc.userData.health <= 0) {
-    npc.userData.health = 0;
-    npc.userData.alive = false;
-    npc.visible = false;
-
-    player.kills++;
-    updateHUD();
-    showNotice("NPC ELIMINADO");
-
-    setTimeout(() => {
-      let x = 0, z = 0, attempts = 0;
-
-      do {
-        x = (Math.random() - 0.5) * 180;
-        z = (Math.random() - 0.5) * 180;
-        attempts++;
-      } while ((blocked(x, z) || Math.hypot(x, z) < 18) && attempts < 100);
-
-      npc.position.set(x, 0, z);
-      npc.userData.health = 100;
-      npc.userData.alive = true;
-      npc.visible = true;
-    }, 5000);
-  }
-}
-
-/* =========================================
-   DERRIBO, REMATE Y REANIMACIÓN
-========================================= */
-
-function becomeDowned(attackerName) {
-  if (player.downed || player.eliminated) return;
-
-  player.health = 0;
-  player.alive = false;
-  player.downed = true;
-  player.eliminated = false;
-  player.downDeadline = Date.now() + DOWN_TIME * 1000;
-  player.velocity.set(0, 0, 0);
-  player.reviveProgress = 0;
-  player.reviveTargetId = null;
-
-  downScreen.classList.remove("hidden");
-  eliminatedScreen.classList.add("hidden");
-
-  if (document.pointerLockElement) document.exitPointerLock();
-
-  send("downed", {
-    targetId: myId,
-    deadline: player.downDeadline
-  });
-
+  publishScoreboard();
+  showNotice(reason);
   updateHUD();
-  showNotice(`${attackerName} te derribó`);
-}
-
-function finishPlayer(attackerName) {
-  if (player.eliminated) return;
-
-  player.downed = false;
-  player.alive = false;
-  player.eliminated = true;
-  player.health = 0;
-  player.reviveTargetId = null;
-
-  downScreen.classList.add("hidden");
-  eliminatedScreen.classList.remove("hidden");
-
-  send("finish", {
-    targetId: myId,
-    attackerName
-  });
-
-  updateHUD();
-  showNotice("HAS SIDO REMATADO");
-}
-
-function receiveDamage(amount, attackerName, headshot = false, finish = false) {
-  if (finish && player.downed) {
-    finishPlayer(attackerName);
-    return;
-  }
-
-  if (player.eliminated) return;
-
-  if (player.downed) {
-    finishPlayer(attackerName);
-    return;
-  }
-
-  if (!player.alive) return;
-
-  player.health = Math.max(0, player.health - amount);
-  updateHUD();
-
-  if (player.health <= 0) {
-    becomeDowned(attackerName);
-  } else {
-    showNotice(headshot ? "TE DIERON EN LA CABEZA" : "RECIBISTE DAÑO");
-  }
-}
-
-function revivePlayer(reviverId) {
-  if (!player.downed || player.eliminated) return;
-
-  player.downed = false;
-  player.eliminated = false;
-  player.alive = true;
-  player.health = 50;
-  player.downDeadline = 0;
-  player.reviveProgress = 0;
-  player.reviveTargetId = null;
-  player.velocity.set(0, 0, 0);
-
-  downScreen.classList.add("hidden");
-  eliminatedScreen.classList.add("hidden");
-
-  send("revived", {
-    targetId: myId,
-    reviverId,
-    x: player.position.x,
-    z: player.position.z,
-    health: player.health
-  });
-
-  updateHUD();
-  showNotice("¡TE HAN REANIMADO!");
+  updateLeaderboard();
 }
 
 function respawnPlayer() {
-  player.position.set(0, 1.7, 6);
-  player.velocity.set(0, 0, 0);
-  player.yaw = 0;
-  player.pitch = 0;
-  player.health = PLAYER_MAX_HEALTH;
-  player.alive = true;
-  player.downed = false;
-  player.eliminated = false;
-  player.crouched = false;
-  player.sliding = false;
-  player.aiming = false;
-  player.downDeadline = 0;
-  player.reviveProgress = 0;
-  player.reviveTargetId = null;
+  playerDead = false;
+  playerDowned = false;
+  playerHealth = MAX_HEALTH;
+  playerKills = 0;
+  downedUntil = 0;
 
-  downScreen.classList.add("hidden");
-  eliminatedScreen.classList.add("hidden");
+  deadPanel.classList.add("hidden");
+  downedPanel.classList.add("hidden");
 
-  send("respawn", {
-    x: player.position.x,
-    z: player.position.z,
-    health: player.health
+  resetPlayerPosition();
+  sendEvent("respawn", {
+    name: username,
+    kills: 0,
+    health: MAX_HEALTH
   });
 
+  sendPlayerState();
+  publishScoreboard();
   updateHUD();
-  showNotice("HAS REAPARECIDO");
+  updateLeaderboard();
+  showNotice("Has reaparecido");
 }
 
-function updateDowned(delta) {
-  if (!player.downed) return;
+respawnButton.addEventListener("click", respawnPlayer);
 
-  const remaining = Math.max(0, (player.downDeadline - Date.now()) / 1000);
+/* =========================================================
+   REANIMACIÓN Y CUENTA REGRESIVA
+========================================================= */
 
-  downTimer.textContent = String(Math.ceil(remaining));
-  downTimerFill.style.width = `${(remaining / DOWN_TIME) * 100}%`;
+function findReviveTarget() {
+  let closest = null;
+  let closestDistance = 3.2;
 
-  if (remaining <= 0) {
-    finishPlayer("Tiempo agotado");
-  }
-}
+  for (const remote of remotePlayers.values()) {
+    if (remote.dead || !remote.downed) continue;
 
-function findNearbyDowned() {
-  let nearest = null;
-  let nearestDistance = Infinity;
+    const distance = camera.position.distanceTo(remote.group.position);
 
-  for (const r of remotePlayers.values()) {
-    if (!r.downed || r.eliminated) continue;
-
-    const distance = Math.hypot(
-      player.position.x - r.avatar.position.x,
-      player.position.z - r.avatar.position.z
-    );
-
-    if (distance < 3 && distance < nearestDistance) {
-      nearest = r;
-      nearestDistance = distance;
+    if (distance < closestDistance) {
+      closest = remote;
+      closestDistance = distance;
     }
   }
 
-  return nearest;
+  return closest;
 }
 
-function updateRevive(delta) {
-  if (!player.alive || player.downed || player.eliminated || settingsOpen) {
-    player.reviveTargetId = null;
-    player.reviveProgress = 0;
+function updateRevive() {
+  if (playerDead || playerDowned) {
+    pickupHint.textContent = "";
     return;
   }
 
-  const target = findNearbyDowned();
+  const target = findReviveTarget();
 
-  if (!target || !keys.KeyE) {
-    if (player.reviveTargetId) {
-      send("reviveProgress", {
-        targetId: player.reviveTargetId,
-        reviverId: myId,
-        progress: 0
-      });
-    }
+  if (target) {
+    pickupHint.textContent = `Mantén E para reanimar a ${target.name}`;
 
-    player.reviveTargetId = null;
-    player.reviveProgress = 0;
-    reviveStatus.textContent = "Espera a un compañero";
-    return;
-  }
+    if (keys.has("KeyE")) {
+      if (currentReviveTarget !== target.id) {
+        currentReviveTarget = target.id;
+        reviveStartTime = performance.now();
+      }
 
-  if (player.reviveTargetId !== target.id) {
-    player.reviveTargetId = target.id;
-    player.reviveProgress = 0;
-  }
+      const elapsed = (performance.now() - reviveStartTime) / 1000;
+      const remaining = Math.max(0, REVIVE_SECONDS - elapsed);
 
-  player.reviveProgress += delta;
-  const progress = Math.min(1, player.reviveProgress / REVIVE_TIME);
+      pickupHint.textContent =
+        `Reanimando a ${target.name}... ${remaining.toFixed(1)} s`;
 
-  send("reviveProgress", {
-    targetId: target.id,
-    reviverId: myId,
-    progress
-  });
+      if (elapsed >= REVIVE_SECONDS) {
+        sendEvent("revive", {
+          target: target.id,
+          health: REVIVE_HEALTH
+        });
 
-  showNotice(`REANIMANDO: ${Math.ceil(REVIVE_TIME - player.reviveProgress)} s`);
+        target.downed = false;
+        target.hp = REVIVE_HEALTH;
+        target.deadline = 0;
 
-  if (player.reviveProgress >= REVIVE_TIME) {
-    send("revived", {
-      targetId: target.id,
-      reviverId: myId,
-      x: target.avatar.position.x,
-      z: target.avatar.position.z,
-      health: 50
-    });
+        currentReviveTarget = null;
+        reviveStartTime = 0;
+        pickupHint.textContent = "";
 
-    setRemoteRevived(target, {
-      x: target.avatar.position.x,
-      z: target.avatar.position.z
-    });
-
-    player.reviveTargetId = null;
-    player.reviveProgress = 0;
-    showNotice(`${target.name} ha sido reanimado`);
-  }
-}
-
-/* =========================================
-   MOVIMIENTO
-========================================= */
-
-const PLAYER_HEIGHT = 1.7;
-const GRAVITY = 22;
-const JUMP_FORCE = 7.5;
-
-function startCrouchOrSlide() {
-  if (!player.alive || player.downed || player.eliminated) return;
-
-  if (player.sliding) {
-    player.sliding = false;
-    player.crouched = false;
-    player.slideTimer = 0;
-    showNotice("DESLIZAMIENTO CANCELADO");
-    return;
-  }
-
-  const moving = keys.KeyW || keys.KeyA || keys.KeyS || keys.KeyD;
-
-  if ((keys.ShiftLeft || keys.ShiftRight) && moving && !player.crouched) {
-    player.sliding = true;
-    player.crouched = true;
-    player.slideTimer = 0.75;
-    showNotice("DESLIZAMIENTO");
-  } else {
-    player.crouched = !player.crouched;
-    player.sliding = false;
-  }
-}
-
-function movePlayer(dx, dz) {
-  const nextX = player.position.x + dx;
-  const nextZ = player.position.z + dz;
-
-  if (!blocked(nextX, player.position.z, 0.45)) {
-    player.position.x = nextX;
-  }
-
-  if (!blocked(player.position.x, nextZ, 0.45)) {
-    player.position.z = nextZ;
-  }
-
-  player.position.x = THREE.MathUtils.clamp(player.position.x, -125, 125);
-  player.position.z = THREE.MathUtils.clamp(player.position.z, -125, 125);
-}
-
-function updateMovement(delta) {
-  if (!player.alive || player.downed || player.eliminated || settingsOpen) return;
-
-  if (player.sliding) {
-    player.slideTimer -= delta;
-
-    if (player.slideTimer <= 0) {
-      player.sliding = false;
-      player.crouched = true;
-    }
-  }
-
-  const forward = new THREE.Vector3(
-    -Math.sin(player.yaw), 0, -Math.cos(player.yaw)
-  );
-
-  const right = new THREE.Vector3(
-    Math.cos(player.yaw), 0, -Math.sin(player.yaw)
-  );
-
-  const move = new THREE.Vector3();
-
-  if (keys.KeyW) move.add(forward);
-  if (keys.KeyS) move.sub(forward);
-  if (keys.KeyD) move.add(right);
-  if (keys.KeyA) move.sub(right);
-
-  if (move.lengthSq() > 0) move.normalize();
-
-  let speed = 7;
-
-  if (player.sliding) speed = 15;
-  else if (player.crouched) speed = 3.5;
-  else if (keys.ShiftLeft || keys.ShiftRight) speed = 11;
-
-  if (player.aiming) speed *= 0.65;
-
-  movePlayer(move.x * speed * delta, move.z * speed * delta);
-
-  if (player.grounded && keys.Space && !player.crouched) {
-    player.velocity.y = JUMP_FORCE;
-    player.grounded = false;
-  }
-
-  player.velocity.y -= GRAVITY * delta;
-  player.position.y += player.velocity.y * delta;
-
-  if (player.position.y <= PLAYER_HEIGHT) {
-    player.position.y = PLAYER_HEIGHT;
-    player.velocity.y = 0;
-    player.grounded = true;
-  }
-
-  camera.position.copy(player.position);
-
-  if (player.sliding) camera.position.y -= 1.05;
-  else if (player.crouched) camera.position.y -= 0.65;
-
-  camera.rotation.order = "YXZ";
-  camera.rotation.y = player.yaw;
-  camera.rotation.x = player.pitch;
-  camera.rotation.z = player.sliding ? 0.035 : 0;
-}
-
-function updateAiming() {
-  player.aiming = rightMouse && !settingsOpen && player.alive && !player.downed;
-
-  const targetFov = player.aiming ? Math.min(48, normalFov) : normalFov;
-
-  camera.fov = THREE.MathUtils.lerp(camera.fov, targetFov, 0.2);
-  camera.updateProjectionMatrix();
-
-  crosshair.style.opacity = player.aiming ? "0.45" : "1";
-  crosshair.style.display = showCrosshair ? "block" : "none";
-}
-
-/* =========================================
-   NPC: MOVIMIENTO Y ATAQUES
-========================================= */
-
-function updateNPCs(delta) {
-  for (const npc of npcs) {
-    if (!npc.userData.alive) continue;
-
-    const distance = Math.hypot(
-      npc.position.x - player.position.x,
-      npc.position.z - player.position.z
-    );
-
-    if (distance < 13 && player.alive && !player.downed) {
-      npc.lookAt(player.position.x, 0, player.position.z);
-
-      if (distance < 8 && performance.now() - npc.userData.lastAttack > 1400) {
-        npc.userData.lastAttack = performance.now();
-        if (Math.random() < 0.3) receiveDamage(5, npc.userData.name);
+        showNotice(`Reanimaste a ${target.name}`);
       }
     } else {
-      npc.userData.moveTimer -= delta;
-
-      if (npc.userData.moveTimer <= 0) {
-        npc.userData.moveTimer = 1 + Math.random() * 3;
-        npc.userData.direction += (Math.random() - 0.5) * 2.4;
-      }
-
-      const dx = Math.sin(npc.userData.direction) * delta;
-      const dz = Math.cos(npc.userData.direction) * delta;
-
-      if (!blocked(npc.position.x + dx, npc.position.z + dz)) {
-        npc.position.x += dx;
-        npc.position.z += dz;
-      } else {
-        npc.userData.direction += Math.PI / 2;
-      }
-
-      npc.rotation.y = npc.userData.direction;
+      currentReviveTarget = null;
+      reviveStartTime = 0;
     }
-  }
-}
 
-/* =========================================
-   SINCRONIZACIÓN
-========================================= */
-
-function updateNetwork() {
-  if (!connected || performance.now() - lastBroadcast < 100) return;
-  lastBroadcast = performance.now();
-
-  send("position", {
-    x: player.position.x,
-    y: player.position.y,
-    z: player.position.z,
-    yaw: player.yaw,
-    health: player.health,
-    alive: player.alive,
-    downed: player.downed,
-    eliminated: player.eliminated,
-    crouched: player.crouched,
-    sliding: player.sliding
-  });
-}
-
-setInterval(() => {
-  const now = performance.now();
-
-  for (const [id, r] of remotePlayers) {
-    if (now - r.lastUpdate > 15000) {
-      scene.remove(r.avatar);
-      remotePlayers.delete(id);
-    }
-  }
-
-  updatePlayerCount();
-}, 3000);
-
-/* =========================================
-   CONTROLES DEL TECLADO
-========================================= */
-
-window.addEventListener("keydown", (event) => {
-  if (event.code === "Tab" && gameStarted) {
-    event.preventDefault();
-    toggleSettings();
     return;
   }
 
-  keys[event.code] = true;
+  currentReviveTarget = null;
+  reviveStartTime = 0;
 
-  if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.code)) {
-    event.preventDefault();
+  // Mostrar opción de recoger botiquín
+  const medkit = findNearestMedkit();
+
+  if (medkit && playerHealth < MAX_HEALTH) {
+    pickupHint.textContent = "Presiona E para recoger el botiquín";
+  } else {
+    pickupHint.textContent = "";
+  }
+}
+
+function updateDownedTimer() {
+  if (playerDowned && !playerDead) {
+    const remaining = Math.max(0, Math.ceil((downedUntil - Date.now()) / 1000));
+    downTimer.textContent = remaining;
+
+    if (remaining <= 0) {
+      eliminatePlayer("Se acabó el tiempo para reanimarte");
+    }
+  }
+}
+
+/* =========================================================
+   RECOGER BOTIQUINES
+========================================================= */
+
+function findNearestMedkit() {
+  let closest = null;
+  let closestDistance = 2.8;
+
+  for (const medkit of medkits) {
+    const distance = camera.position.distanceTo(medkit.group.position);
+
+    if (distance < closestDistance) {
+      closest = medkit;
+      closestDistance = distance;
+    }
   }
 
-  if (!gameStarted || event.repeat) return;
+  return closest;
+}
 
-  if (event.code === "KeyC") startCrouchOrSlide();
+function pickupMedkit() {
+  if (playerDead || playerDowned) return;
 
-  if (event.code === "KeyE" && player.eliminated) respawnPlayer();
-});
+  const medkit = findNearestMedkit();
+  if (!medkit) return;
 
-window.addEventListener("keyup", (event) => {
-  keys[event.code] = false;
-});
+  if (playerHealth >= MAX_HEALTH) {
+    showNotice("Ya tienes la vida completa");
+    return;
+  }
+
+  playerHealth = Math.min(MAX_HEALTH, playerHealth + MEDKIT_HEAL);
+
+  scene.remove(medkit.group);
+
+  const index = medkits.indexOf(medkit);
+  if (index !== -1) medkits.splice(index, 1);
+
+  updateHUD();
+  showNotice(`Botiquín recogido: +${MEDKIT_HEAL} de vida`);
+}
+
+/* =========================================================
+   NPC: MOVIMIENTO Y BOTIQUINES
+========================================================= */
+
+function updateNPCs(delta) {
+  const now = performance.now();
+
+  for (const npc of npcs) {
+    if (!npc.alive) continue;
+
+    if (now > npc.nextMove) {
+      npc.nextMove = now + 1500 + Math.random() * 2500;
+
+      npc.moveTarget.set(
+        npc.group.position.x + (Math.random() - 0.5) * 15,
+        0,
+        npc.group.position.z + (Math.random() - 0.5) * 15
+      );
+    }
+
+    const current = npc.group.position;
+    const direction = new THREE.Vector3()
+      .subVectors(npc.moveTarget, current);
+
+    direction.y = 0;
+
+    if (direction.length() > 0.5) {
+      direction.normalize();
+      current.addScaledVector(direction, npc.speed * delta);
+      npc.group.rotation.y = Math.atan2(direction.x, direction.z);
+    }
+
+    // NPC se acerca al jugador y causa daño al contacto.
+    if (!playerDead && !playerDowned) {
+      const distance = current.distanceTo(
+        new THREE.Vector3(playerPosition.x, 0, playerPosition.z)
+      );
+
+      if (distance < 1.5 && now - lastDamageTime > 1000) {
+        damagePlayer(5);
+      }
+    }
+
+    npc.legL.rotation.x = Math.sin(now * 0.008 + npc.id.length) * 0.25;
+    npc.legR.rotation.x = -npc.legL.rotation.x;
+  }
+
+  // Rotación y expiración de botiquines
+  for (let i = medkits.length - 1; i >= 0; i--) {
+    const medkit = medkits[i];
+
+    medkit.group.rotation.y += delta;
+    medkit.group.position.y = 0.05 + Math.sin(now * 0.003 + i) * 0.08;
+
+    if (now > medkit.expiresAt) {
+      scene.remove(medkit.group);
+      medkits.splice(i, 1);
+    }
+  }
+}
+
+/* =========================================================
+   CONTROLES: RATÓN, TECLADO Y AJUSTES
+========================================================= */
 
 renderer.domElement.addEventListener("click", () => {
-  if (gameStarted && !settingsOpen && !player.downed && !player.eliminated) {
-    renderer.domElement.requestPointerLock();
-  }
-});
+  if (!gameStarted || playerDead || playerDowned) return;
 
-document.addEventListener("pointerlockchange", () => {
   if (document.pointerLockElement !== renderer.domElement) {
-    leftMouse = false;
-    rightMouse = false;
-  }
-});
-
-document.addEventListener("mousemove", (event) => {
-  if (
-    !gameStarted || settingsOpen ||
-    document.pointerLockElement !== renderer.domElement ||
-    !player.alive || player.downed || player.eliminated
-  ) return;
-
-  const sensitivity = mouseSensitivity * (player.aiming ? 0.64 : 1);
-
-  player.yaw -= event.movementX * sensitivity;
-  player.pitch -= event.movementY * sensitivity;
-
-  player.pitch = THREE.MathUtils.clamp(
-    player.pitch,
-    -Math.PI / 2 + 0.05,
-    Math.PI / 2 - 0.05
-  );
-});
-
-document.addEventListener("mousedown", (event) => {
-  if (!gameStarted || settingsOpen) return;
-
-  if (event.button === 0) {
-    leftMouse = true;
+    renderer.domElement.requestPointerLock?.();
+  } else {
     shoot();
   }
-
-  if (event.button === 2) rightMouse = true;
 });
 
-document.addEventListener("mouseup", (event) => {
-  if (event.button === 0) leftMouse = false;
-  if (event.button === 2) rightMouse = false;
+document.addEventListener("mousemove", event => {
+  if (document.pointerLockElement !== renderer.domElement) return;
+  if (settings.classList.contains("hidden") === false) return;
+  if (playerDead || playerDowned) return;
+
+  yaw -= event.movementX * mouseSensitivity;
+  pitch -= event.movementY * mouseSensitivity;
+
+  pitch = THREE.MathUtils.clamp(pitch, -Math.PI / 2 + 0.02, Math.PI / 2 - 0.02);
+  camera.rotation.set(pitch, yaw, 0, "YXZ");
 });
 
-document.addEventListener("contextmenu", (event) => {
-  if (gameStarted) event.preventDefault();
-});
-
-/* =========================================
-   AJUSTES CON TAB
-========================================= */
-
-const sensitivityInput = $("sensitivity");
-const sensitivityValue = $("sensitivityValue");
-const fovInput = $("fovSetting");
-const fovValue = $("fovValue");
-const graphicsSelect = $("graphicsSetting");
-const crosshairInput = $("crosshairSetting");
-
-function openSettings() {
-  if (!gameStarted || settingsOpen) return;
-
-  settingsOpen = true;
-  leftMouse = false;
-  rightMouse = false;
-  settingsMenu.classList.remove("hidden");
-
-  if (document.pointerLockElement) document.exitPointerLock();
-}
-
-function closeSettings() {
-  if (!settingsOpen) return;
-
-  settingsOpen = false;
-  settingsMenu.classList.add("hidden");
-
-  if (gameStarted && player.alive && !player.downed && !player.eliminated) {
-    renderer.domElement.requestPointerLock();
-  }
-}
-
-function toggleSettings() {
-  if (settingsOpen) closeSettings();
-  else openSettings();
-}
-
-$("resumeButton").addEventListener("click", closeSettings);
-
-sensitivityInput.addEventListener("input", () => {
-  const value = Number(sensitivityInput.value);
-  mouseSensitivity = value / 1000;
-  sensitivityValue.textContent = value.toFixed(1);
-});
-
-fovInput.addEventListener("input", () => {
-  normalFov = Number(fovInput.value);
-  fovValue.textContent = String(normalFov);
-
-  if (!player.aiming) {
-    camera.fov = normalFov;
-    camera.updateProjectionMatrix();
+document.addEventListener("mousedown", event => {
+  if (event.button === 2 && gameStarted && !playerDead && !playerDowned) {
+    isAiming = true;
   }
 });
 
-graphicsSelect.addEventListener("change", () => {
-  graphicsQuality = graphicsSelect.value;
+document.addEventListener("mouseup", event => {
+  if (event.button === 2) isAiming = false;
+});
 
-  if (graphicsQuality === "low") {
-    renderer.setPixelRatio(1);
-    renderer.shadowMap.enabled = false;
+document.addEventListener("contextmenu", event => event.preventDefault());
+
+document.addEventListener("keydown", event => {
+  keys.add(event.code);
+
+  if (event.code === "Tab") {
+    event.preventDefault();
+
+    if (!gameStarted) return;
+
+    settings.classList.toggle("hidden");
+
+    if (settings.classList.contains("hidden")) {
+      renderer.domElement.requestPointerLock?.();
+    } else if (document.pointerLockElement) {
+      document.exitPointerLock();
+    }
+  }
+
+  if (event.code === "KeyC" && !event.repeat) {
+    isCrouching = !isCrouching;
+  }
+
+  if (event.code === "KeyE" && !event.repeat) {
+    const medkit = findNearestMedkit();
+
+    if (medkit && !findReviveTarget()) {
+      pickupMedkit();
+    }
+  }
+
+  if (event.code === "Escape") {
+    isAiming = false;
+  }
+});
+
+document.addEventListener("keyup", event => {
+  keys.delete(event.code);
+});
+
+$("sensitivity").addEventListener("input", event => {
+  mouseSensitivity = Number(event.target.value);
+});
+
+$("fov").addEventListener("input", event => {
+  cameraFov = Number(event.target.value);
+  camera.fov = cameraFov;
+  camera.updateProjectionMatrix();
+});
+
+$("quality").addEventListener("change", event => {
+  graphicsQuality = event.target.value;
+
+  if (graphicsQuality === "high") {
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
   } else if (graphicsQuality === "medium") {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.shadowMap.enabled = true;
   } else {
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.shadowMap.enabled = true;
+    renderer.setPixelRatio(1);
+    renderer.shadowMap.enabled = false;
   }
 
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-crosshairInput.addEventListener("change", () => {
-  showCrosshair = crosshairInput.checked;
-  crosshair.style.display = showCrosshair ? "block" : "none";
+$("showCrosshair").addEventListener("change", event => {
+  crosshair.style.display = event.target.checked ? "block" : "none";
 });
 
-$("resetSettingsButton").addEventListener("click", () => {
-  sensitivityInput.value = "2.2";
-  fovInput.value = "75";
-  graphicsSelect.value = "medium";
-  crosshairInput.checked = true;
-
-  mouseSensitivity = 0.0022;
-  normalFov = 75;
-  graphicsQuality = "medium";
-  showCrosshair = true;
-
-  sensitivityValue.textContent = "2.2";
-  fovValue.textContent = "75";
-  crosshair.style.display = "block";
-
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-  renderer.shadowMap.enabled = true;
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  camera.fov = normalFov;
-  camera.updateProjectionMatrix();
-
-  showNotice("AJUSTES RESTABLECIDOS");
-});
-
-/* =========================================
-   INICIO
-========================================= */
-
-playButton.addEventListener("click", async () => {
-  if (gameStarted) return;
-
-  playerName = playerNameInput.value.trim().slice(0, 16) || "Jugador";
-  playButton.disabled = true;
-  menuError.textContent = "Conectando con la ciudad...";
-
-  try {
-    await connectMultiplayer();
-
-    gameStarted = true;
-    menu.classList.add("hidden");
-    hud.classList.remove("hidden");
-
-    player.position.set(0, PLAYER_HEIGHT, 6);
-    camera.position.copy(player.position);
-
-    updateHUD();
-    updatePlayerCount();
-
-    renderer.domElement.requestPointerLock();
-    showNotice("¡BIENVENIDO A LA CIUDAD!");
-  } catch (error) {
-    console.error(error);
-    menuError.textContent = error.message || "Error al conectar.";
-    playButton.disabled = false;
-  }
-});
-
-/* =========================================
+/* =========================================================
    BUCLE PRINCIPAL
-========================================= */
+========================================================= */
 
-const clock = new THREE.Clock();
+let previousFrame = performance.now();
 
-function animate() {
+function animate(now) {
   requestAnimationFrame(animate);
 
-  const delta = Math.min(clock.getDelta(), 0.05);
+  const delta = Math.min((now - previousFrame) / 1000, 0.05);
+  previousFrame = now;
 
   if (gameStarted) {
-    if (!settingsOpen) {
-      updateMovement(delta);
-      updateAiming();
-      animateWeapon(delta);
-      updateRevive(delta);
-    }
-
-    updateDowned(delta);
+    updateMovement(delta);
     updateNPCs(delta);
-    updateTracers(delta);
-    updateNetwork();
+    updateRemotePlayers(delta);
+    updateRevive();
+    updateDownedTimer();
 
-    if (player.downed) {
-      reviveStatus.textContent =
-        player.reviveTargetId ? "Un compañero está intentando reanimarte" :
-        "Espera a que un compañero se acerque y mantenga E";
+    // El TOP se actualiza localmente durante toda la partida.
+    updateLeaderboard();
+    updateHUD();
+
+    if (joined && now - lastStateBroadcast > 100) {
+      lastStateBroadcast = now;
+      sendPlayerState();
     }
-  } else {
-    updateTracers(delta);
+
+    if (joined && now - lastLeaderboardBroadcast > 700) {
+      lastLeaderboardBroadcast = now;
+      publishScoreboard();
+    }
   }
 
   renderer.render(scene, camera);
 }
 
-animate();
+requestAnimationFrame(animate);
 
-/* =========================================
-   VENTANA Y SALIDA
-========================================= */
+/* =========================================================
+   REAJUSTE DE VENTANA
+========================================================= */
 
 window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
 
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(
-    graphicsQuality === "low" ? 1 :
-    graphicsQuality === "high" ? Math.min(window.devicePixelRatio, 2) :
-    Math.min(window.devicePixelRatio, 1.5)
-  );
 });
 
+/* =========================================================
+   LIMPIEZA DE CONEXIÓN
+========================================================= */
+
 window.addEventListener("beforeunload", () => {
-  if (channel) supabase.removeChannel(channel);
+  if (channel) {
+    supabase.removeChannel(channel);
+  }
 });
