@@ -1,68 +1,28 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Ciudad Abierta 3D</title>
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-  <div id="menu" class="menu">
+
+<div id="menu">
     <div class="menu-card">
-      <h1>Ciudad Abierta 3D</h1>
-      <p>Explora la ciudad y juega con tus amigos.</p>
+        <h1>CIUDAD <span>ABIERTA</span></h1>
+        <p>Explora la ciudad. Compite con tus amigos.</p>
 
-      <label for="playerName">Nombre del jugador</label>
-      <input id="playerName" maxlength="18" value="Jugador" placeholder="Tu nombre">
+        <div class="server-status">
+            <span class="status-dot"></span>
+            PARTIDA PÚBLICA
+        </div>
 
-      <label for="roomCode">Código de sala</label>
-      <input id="roomCode" maxlength="24" placeholder="Código de tu amigo">
+        <p class="player-limit">MÁXIMO 10 JUGADORES</p>
 
-      <div class="lobby-actions">
-        <button id="createLobbyBtn" type="button">Crear lobby</button>
-        <button id="joinBtn" type="button">Unirse a lobby</button>
-      </div>
+        <input
+            id="playerName"
+            type="text"
+            placeholder="Escribe tu nombre"
+            maxlength="16"
+            autocomplete="off"
+        >
 
-      <p id="status" class="status">
-        Crea una sala o escribe el código de un amigo.
-      </p>
+        <button id="createLobbyBtn" type="button">
+            JUGAR
+        </button>
 
-      <p class="instructions">
-        WASD: moverse · Espacio: saltar · Ctrl: agacharse · Shift: correr
-      </p>
+        <p id="gameNotice">Preparando partida...</p>
     </div>
-  </div>
-
-  <div id="hud" class="hidden">
-    <button id="leaveBtn" class="leave" type="button">Salir</button>
-
-    <div class="scoreboard">
-      <div class="score-title">CLASIFICACIÓN</div>
-      <div class="score-head">
-        <span>Jugador</span>
-        <span>Kills</span>
-      </div>
-      <div id="scoreRows"></div>
-    </div>
-
-    <div class="stats">
-      <span>Vida: <b id="health">100</b></span>
-      <span>Arma: <b id="weapon">Pistola</b></span>
-      <span>Munición: <b id="ammo">12 / 12</b></span>
-      <span>Jugadores: <b id="players">1</b></span>
-    </div>
-
-    <div class="crosshair">+</div>
-
-    <div class="help">
-      WASD mover · Espacio saltar · Ctrl agacharse · Shift correr ·
-      Clic izquierdo disparar · Clic derecho apuntar · 1/2 armas ·
-      R recargar · Esc liberar mouse
-    </div>
-
-    <div id="gameNotice" class="game-notice"></div>
-  </div>
-
-  <script type="module" src="game.js"></script>
-</body>
-</html>
+</div>
