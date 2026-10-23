@@ -10,7 +10,7 @@ import { createClient } from
   Sustituye estos dos valores por los de tu proyecto Supabase.
   No uses claves secretas ni service_role en el navegador.
 */
-const SUPABASE_URL = "https://vlwfntwxbzmeodutbrxd.supabase.co/rest/v1/";
+const SUPABASE_URL = "https://vlwfntwxbzmeodutbrxd.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JKRwt7biD2Y9wCQpQC9iQA_-EDPL17V";
 
 const $ = (id) => document.getElementById(id);
