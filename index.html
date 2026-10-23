@@ -1,75 +1,69 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#101820">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Ciudad Abierta 3D</title>
-  <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <main id="menu" class="menu">
-    <div class="logo">CA<span>3D</span></div>
-    <p class="eyebrow">MUNDO ABIERTO · MULTIJUGADOR</p>
-    <h1>CIUDAD ABIERTA</h1>
-    <p class="subtitle">Una ciudad. Diez jugadores. Tu aventura.</p>
-
-    <form id="joinForm">
-      <label for="playerName">Nombre de jugador</label>
-      <input id="playerName" maxlength="18"
-        placeholder="Escribe tu nombre" autocomplete="nickname" required>
-      <button id="playButton" type="submit">ENTRAR A LA CIUDAD</button>
-    </form>
-
-    <p id="menuStatus" class="status">Escribe tu nombre para comenzar.</p>
-
-    <div class="menu-footer">
-      <span>● SALA PÚBLICA</span>
-      <span>HASTA 10 JUGADORES</span>
+  <div id="menu">
+    <div class="menu-panel">
+      <h1>CIUDAD ABIERTA <span>3D</span></h1>
+      <p>Explora la ciudad. Sobrevive. Domina el combate.</p>
+      <input id="playerName" maxlength="16" placeholder="Tu nombre" value="Jugador" />
+      <button id="playButton">ENTRAR A LA CIUDAD</button>
+      <small>Multijugador mediante Supabase Realtime</small>
+      <p id="menuError"></p>
     </div>
-  </main>
+  </div>
 
-  <main id="game" hidden>
-    <header id="hud">
-      <div class="brand">
-        <strong>CIUDAD <span>ABIERTA 3D</span></strong>
-        <small>Sala pública: <b id="playerCount">1</b>/10</small>
+  <div id="hud" class="hidden">
+    <div class="topbar">
+      <div class="brand">CIUDAD ABIERTA <span>3D</span></div>
+      <div id="playerCount">Jugadores: 1/10</div>
+      <div id="killCount">Bajas: 0</div>
+    </div>
+
+    <div class="health-panel">
+      <div class="health-label">
+        <span>VIDA</span>
+        <span id="healthText">100 / 100</span>
       </div>
-
-      <div class="stats">
-        <div class="stat">
-          <small>VIDA</small>
-          <strong id="health">100</strong>
-        </div>
-        <div class="stat">
-          <small>BAJAS</small>
-          <strong id="score">0</strong>
-        </div>
+      <div class="health-track">
+        <div id="healthFill"></div>
       </div>
+      <div id="statusText">LISTO PARA COMBATIR</div>
+    </div>
 
-      <button id="leaveButton" class="leave-button" type="button">SALIR</button>
-    </header>
+    <div id="crosshair">
+      <i class="line top"></i>
+      <i class="line bottom"></i>
+      <i class="line left"></i>
+      <i class="line right"></i>
+      <i class="dot"></i>
+    </div>
 
-    <div id="crosshair">+</div>
+    <div id="hitMarker">×</div>
+    <div id="notice"></div>
 
-    <aside id="help">
-      <strong>CONTROLES</strong>
-      <p>W A S D — Moverte</p>
-      <p>SHIFT — Correr</p>
-      <p>SHIFT + C — Deslizarte</p>
-      <p>CTRL — Agacharte</p>
-      <p>RATÓN — Mirar</p>
-      <p>CLIC IZQUIERDO — Disparar</p>
-      <p>ESPACIO — Saltar</p>
-      <p>E — Mantener para revivir</p>
-      <p>ESC — Liberar ratón</p>
-    </aside>
+    <div class="bottom-hint">
+      <span>W A S D · Mover</span>
+      <span>Mouse · Disparar</span>
+      <span>Click derecho · Apuntar</span>
+      <span>Shift · Correr</span>
+      <span>C · Agacharse / deslizarse</span>
+      <span>Espacio · Saltar</span>
+      <span>E · Reaparecer si estás derribado</span>
+      <span>Esc · Liberar cursor</span>
+    </div>
 
-    <div id="notice" role="status">Cargando ciudad...</div>
-    <div id="lockMessage">Haz clic en la ciudad para jugar</div>
-  </main>
+    <div id="downScreen" class="hidden">
+      <h2>ESTÁS DERRIBADO</h2>
+      <p>Presiona E para reaparecer</p>
+    </div>
+  </div>
 
-  <script type="module" src="./game.js"></script>
+  <script type="module" src="game.js"></script>
 </body>
 </html>
