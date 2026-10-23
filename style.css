@@ -1,341 +1,120 @@
-* {
-  box-sizing: border-box;
-}
+/* ========================================
+   MENÚ DE AJUSTES
+======================================== */
 
-html,
-body {
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  overflow: hidden;
-  background: #111820;
-  color: white;
-  font-family: Arial, Helvetica, sans-serif;
-}
-
-body {
-  user-select: none;
-}
-
-.hidden {
-  display: none !important;
-}
-
-#menu {
+#settingsMenu {
   position: fixed;
   inset: 0;
-  z-index: 20;
+  z-index: 50;
   display: flex;
   align-items: center;
   justify-content: center;
-  background:
-    linear-gradient(120deg, rgba(7, 15, 25, 0.96), rgba(12, 35, 45, 0.75)),
-    radial-gradient(circle at center, #36525a, #101820);
+  padding: 16px;
+  background: rgba(3, 8, 14, 0.82);
+  pointer-events: auto;
 }
 
-.menu-panel {
-  width: min(440px, 90vw);
-  padding: 38px 30px;
-  text-align: center;
-  background: rgba(10, 17, 25, 0.9);
-  border: 1px solid rgba(100, 220, 255, 0.35);
+.settings-panel {
+  width: min(440px, 94vw);
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 28px;
+  border: 1px solid rgba(64, 217, 255, 0.5);
   border-radius: 12px;
-  box-shadow: 0 15px 60px #0009;
+  background: linear-gradient(145deg, #172631, #09131c);
+  box-shadow: 0 20px 65px #000b;
 }
 
-.menu-panel h1 {
-  margin: 0 0 12px;
-  font-size: clamp(28px, 5vw, 42px);
-  letter-spacing: 2px;
-}
-
-.menu-panel h1 span,
-.brand span {
+.settings-panel h2 {
+  margin: 0;
   color: #40d9ff;
+  text-align: center;
+  letter-spacing: 1.5px;
+  font-size: 23px;
 }
 
-.menu-panel p {
-  color: #bdcbd3;
-  line-height: 1.5;
+.settings-subtitle {
+  margin: 8px 0 26px;
+  color: #a9bac5;
+  text-align: center;
+  font-size: 13px;
 }
 
-#playerName {
-  display: block;
+.settings-panel > label:not(.settings-check) {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 20px 0 10px;
+  color: #f0f5f8;
+  font-size: 14px;
+}
+
+.settings-panel input[type="range"] {
   width: 100%;
-  margin: 24px 0 12px;
-  padding: 14px;
-  color: white;
-  background: #192630;
-  border: 1px solid #38505f;
-  border-radius: 6px;
-  font-size: 16px;
-  outline: none;
-}
-
-#playerName:focus {
-  border-color: #40d9ff;
-}
-
-#playButton {
-  width: 100%;
-  padding: 15px;
-  border: 0;
-  border-radius: 6px;
-  color: #06141b;
-  background: #40d9ff;
-  font-size: 15px;
-  font-weight: bold;
+  accent-color: #40d9ff;
   cursor: pointer;
 }
 
-#playButton:hover {
-  background: #a0efff;
+.settings-panel select {
+  width: 100%;
+  padding: 11px;
+  color: white;
+  background: #172630;
+  border: 1px solid #405461;
+  border-radius: 5px;
 }
 
-#playButton:disabled {
-  opacity: 0.6;
-  cursor: wait;
-}
-
-.menu-panel small {
-  display: block;
-  margin-top: 18px;
-  color: #8da0ad;
-}
-
-#menuError {
-  color: #ff7777;
-  font-size: 13px;
-}
-
-#hud {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-}
-
-.topbar {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
+.settings-check {
   display: flex;
   align-items: center;
-  gap: 22px;
-  padding: 18px 24px;
-  background: linear-gradient(#0009, transparent);
+  gap: 10px;
+  margin-top: 22px;
+  color: #f0f5f8;
+  font-size: 14px;
 }
 
-.brand {
-  margin-right: auto;
-  font-weight: bold;
-  letter-spacing: 1px;
+.settings-check input {
+  width: 17px;
+  height: 17px;
+  accent-color: #40d9ff;
 }
 
-#playerCount,
-#killCount {
-  padding: 8px 12px;
-  border: 1px solid #ffffff25;
-  border-radius: 5px;
-  background: #0006;
-  font-size: 13px;
+.settings-buttons {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-top: 28px;
 }
 
-.health-panel {
-  position: absolute;
-  left: 24px;
-  bottom: 95px;
-  width: 245px;
+.settings-buttons button {
   padding: 13px;
-  border: 1px solid #ffffff25;
-  border-radius: 7px;
-  background: #07121bd9;
-}
-
-.health-label {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 9px;
-  font-size: 12px;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
   font-weight: bold;
 }
 
-.health-track {
-  width: 100%;
-  height: 12px;
-  overflow: hidden;
-  background: #452326;
-  border-radius: 3px;
-}
-
-#healthFill {
-  width: 100%;
-  height: 100%;
-  background: #48e58c;
-  transition: width 0.12s, background 0.12s;
-}
-
-#statusText {
-  margin-top: 9px;
-  color: #a6dce9;
-  font-size: 10px;
-  letter-spacing: 1px;
-}
-
-#crosshair {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 24px;
-  height: 24px;
-  transform: translate(-50%, -50%);
-  transition: width 0.12s, height 0.12s;
-}
-
-#crosshair .line {
-  position: absolute;
-  display: block;
-  background: #fff;
-  border-radius: 2px;
-  box-shadow: 0 0 3px #000;
-}
-
-#crosshair .top,
-#crosshair .bottom {
-  left: 11px;
-  width: 2px;
-  height: 6px;
-}
-
-#crosshair .top {
-  top: 0;
-}
-
-#crosshair .bottom {
-  bottom: 0;
-}
-
-#crosshair .left,
-#crosshair .right {
-  top: 11px;
-  width: 6px;
-  height: 2px;
-}
-
-#crosshair .left {
-  left: 0;
-}
-
-#crosshair .right {
-  right: 0;
-}
-
-#crosshair .dot {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
+#resumeButton {
+  color: #06141b;
   background: #40d9ff;
 }
 
-#hitMarker {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  display: none;
-  transform: translate(-50%, -50%);
-  color: #ff5151;
-  font-size: 38px;
-  font-weight: bold;
-  text-shadow: 0 0 6px #000;
+#resumeButton:hover {
+  background: #a0efff;
 }
 
-.bottom-hint {
-  position: absolute;
-  right: 20px;
-  bottom: 20px;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 7px;
-  max-width: 560px;
-}
-
-.bottom-hint span {
-  padding: 7px 9px;
-  color: #e4eef4;
-  background: #07121bd9;
-  border: 1px solid #ffffff20;
-  border-radius: 4px;
-  font-size: 10px;
-}
-
-#notice {
-  position: absolute;
-  top: 20%;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 10px 16px;
-  border-radius: 5px;
-  background: #07121bd9;
+#resetSettingsButton {
   color: white;
-  font-weight: bold;
-  opacity: 0;
-  transition: opacity 0.15s;
+  background: #344550;
 }
 
-#downScreen {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  background: #18080ac9;
+#resetSettingsButton:hover {
+  background: #465c69;
 }
 
-#downScreen h2 {
-  margin-bottom: 4px;
-  color: #ff6868;
-  font-size: clamp(28px, 5vw, 52px);
-}
-
-#downScreen p {
-  font-size: 17px;
-}
-
-@media (max-width: 600px) {
-  .topbar {
-    gap: 7px;
-    padding: 12px;
-  }
-
-  .brand {
-    font-size: 11px;
-  }
-
-  #playerCount,
-  #killCount {
-    padding: 6px;
-    font-size: 10px;
-  }
-
-  .health-panel {
-    left: 12px;
-    bottom: 110px;
-    width: 190px;
-  }
-
-  .bottom-hint {
-    left: 10px;
-    right: 10px;
-    bottom: 10px;
-    gap: 4px;
-  }
-
-  .bottom-hint span {
-    font-size: 9px;
-  }
+.settings-tip {
+  margin: 18px 0 0;
+  color: #8ea2af;
+  text-align: center;
+  font-size: 11px;
 }
