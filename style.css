@@ -1,118 +1,29 @@
-
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  overflow: hidden;
-  font-family: Arial, sans-serif;
-  background: #111;
-  color: white;
-}
-
-canvas {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
-#menu {
-  position: fixed;
-  inset: 0;
-  z-index: 10;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  background: #18222e;
-}
-
-#menu h1 {
-  margin-bottom: 15px;
-}
-
-#menu input {
-  width: 260px;
-  padding: 12px;
-  border: 1px solid #777;
-  border-radius: 5px;
-}
-
-button {
-  padding: 11px 16px;
-  border: none;
-  border-radius: 5px;
-  background: #2478df;
-  color: white;
-  cursor: pointer;
-}
-
-button:hover {
-  background: #135bb4;
-}
-
-#status {
-  max-width: 90%;
-  overflow-wrap: anywhere;
-}
-
-#hud {
-  display: none;
-  position: fixed;
-  inset: 0;
-  z-index: 5;
-  pointer-events: none;
-}
-
-#health,
-#weapon,
-#ammo,
-#controls {
-  position: absolute;
-  padding: 10px;
-  background: #0009;
-  border-radius: 5px;
-}
-
-#health {
-  top: 12px;
-  left: 12px;
-}
-
-#weapon {
-  top: 55px;
-  left: 12px;
-}
-
-#ammo {
-  top: 98px;
-  left: 12px;
-}
-
-#controls {
-  bottom: 12px;
-  left: 12px;
-  line-height: 1.6;
-}
-
-#releaseBtn,
-#leaveBtn {
-  position: absolute;
-  right: 12px;
-  pointer-events: auto;
-}
-
-#releaseBtn {
-  top: 12px;
-}
-
-#leaveBtn {
-  top: 58px;
-}
-
-#menu button,
-#menu input {
-  pointer-events: auto;
-}
+* { box-sizing: border-box; }
+html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; font-family: Arial, sans-serif; background: #111; color: #fff; }
+canvas { display: block; }
+.hidden { display: none !important; }
+.menu { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: linear-gradient(#07101bdc, #07101be8); }
+.menu-card { width: min(420px, calc(100% - 32px)); padding: 28px; border: 1px solid #ffffff2c; border-radius: 14px; background: #121c29f2; box-shadow: 0 20px 60px #0008; }
+h1 { margin: 0 0 8px; font-size: 30px; }
+.menu-card p { color: #c6d2df; line-height: 1.45; }
+label { display: block; margin: 16px 0 6px; font-size: 13px; color: #dce7f2; }
+input { width: 100%; padding: 12px; border: 1px solid #435266; border-radius: 7px; color: white; background: #0a111a; outline: none; }
+button { cursor: pointer; border: 0; border-radius: 7px; padding: 12px 16px; font-weight: bold; }
+#joinBtn { width: 100%; margin-top: 18px; color: #07111c; background: #6ed7ff; }
+#joinBtn:disabled { opacity: .6; cursor: wait; }
+.status { min-height: 38px; font-size: 12px; }
+small { display: block; color: #a9b7c7; line-height: 1.5; }
+#hud { position: fixed; inset: 0; pointer-events: none; }
+.scoreboard { position: absolute; top: 14px; right: 14px; width: 210px; max-height: 38vh; overflow: hidden; border: 1px solid #ffffff2b; border-radius: 8px; background: #07111dcc; backdrop-filter: blur(5px); font-size: 12px; }
+.score-title { padding: 9px 10px; font-weight: bold; letter-spacing: 1px; font-size: 11px; color: #8ee2ff; border-bottom: 1px solid #ffffff20; }
+.score-head, .score-row { display: grid; grid-template-columns: 1fr 42px; gap: 8px; padding: 6px 10px; }
+.score-head { color: #aebdca; font-size: 10px; text-transform: uppercase; }
+.score-row { border-top: 1px solid #ffffff10; overflow: hidden; }
+.score-row span:first-child { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.score-row span:last-child { text-align: right; font-weight: bold; }
+.stats { position: absolute; left: 16px; bottom: 58px; display: flex; flex-wrap: wrap; gap: 8px; max-width: calc(100% - 260px); }
+.stats span { padding: 8px 10px; border-radius: 6px; background: #07111dcc; font-size: 13px; }
+.crosshair { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font: 28px Arial; color: #fff; text-shadow: 0 1px 4px #000; }
+.help { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); width: max-content; max-width: calc(100% - 24px); text-align: center; padding: 8px 12px; border-radius: 6px; color: #e7edf4; background: #07111dcc; font-size: 11px; }
+.leave { pointer-events: auto; position: absolute; left: 14px; top: 14px; color: white; background: #9d2f39; padding: 9px 12px; }
+@media (max-width: 600px) { .scoreboard { width: 160px; top: 8px; right: 8px; } .stats { left: 8px; bottom: 74px; max-width: calc(100% - 180px); } .stats span { font-size: 11px; padding: 6px; } .help { font-size: 10px; bottom: 8px; } }
