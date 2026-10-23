@@ -1,28 +1,80 @@
 
-<div id="menu">
-    <div class="menu-card">
-        <h1>CIUDAD <span>ABIERTA</span></h1>
-        <p>Explora la ciudad. Compite con tus amigos.</p>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#101820">
+  <title>Ciudad Abierta 3D</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main id="menu" class="menu">
+    <div class="logo">CA<span>3D</span></div>
+    <p class="eyebrow">MUNDO ABIERTO · MULTIJUGADOR</p>
+    <h1>CIUDAD ABIERTA</h1>
+    <p class="subtitle">Una ciudad. Diez jugadores. Tu aventura.</p>
 
-        <div class="server-status">
-            <span class="status-dot"></span>
-            PARTIDA PÚBLICA
-        </div>
+    <form id="joinForm">
+      <label for="playerName">Nombre de jugador</label>
+      <input
+        id="playerName"
+        type="text"
+        maxlength="18"
+        placeholder="Escribe tu nombre"
+        autocomplete="nickname"
+        required
+      >
+      <button id="playButton" type="submit">ENTRAR A LA CIUDAD</button>
+    </form>
 
-        <p class="player-limit">MÁXIMO 10 JUGADORES</p>
+    <p id="menuStatus" class="status" role="status">
+      Escribe tu nombre para comenzar.
+    </p>
 
-        <input
-            id="playerName"
-            type="text"
-            placeholder="Escribe tu nombre"
-            maxlength="16"
-            autocomplete="off"
-        >
-
-        <button id="createLobbyBtn" type="button">
-            JUGAR
-        </button>
-
-        <p id="gameNotice">Preparando partida...</p>
+    <div class="menu-footer">
+      <span>● SALA PÚBLICA</span>
+      <span>HASTA 10 JUGADORES</span>
     </div>
-</div>
+  </main>
+
+  <main id="game" hidden>
+    <header id="hud">
+      <div class="brand">
+        <strong>CIUDAD <span>ABIERTA 3D</span></strong>
+        <small>Sala pública · <b id="playerCount">1</b>/10 jugadores</small>
+      </div>
+
+      <div class="stats">
+        <div class="stat">
+          <small>VIDA</small>
+          <strong id="health">100</strong>
+        </div>
+        <div class="stat">
+          <small>BAJAS</small>
+          <strong id="score">0</strong>
+        </div>
+      </div>
+
+      <button id="leaveButton" class="leave-button" type="button">SALIR</button>
+    </header>
+
+    <div id="crosshair" aria-hidden="true">+</div>
+
+    <aside id="help">
+      <strong>CONTROLES</strong>
+      <p>W A S D — Moverte</p>
+      <p>SHIFT — Correr</p>
+      <p>RATÓN — Mirar</p>
+      <p>CLIC — Disparar</p>
+      <p>ESPACIO — Saltar</p>
+      <p>ESC — Liberar ratón</p>
+    </aside>
+
+    <div id="notice" role="status">Cargando ciudad...</div>
+    <div id="lockMessage">Haz clic en la ciudad para jugar</div>
+  </main>
+
+  <script type="module" src="./game.js"></script>
+</body>
+</html>
