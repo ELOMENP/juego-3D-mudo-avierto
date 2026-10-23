@@ -5,6 +5,8 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 // CONFIGURACIÓN DE SUPABASE
 const SUPABASE_URL = 'https://vlwfntwxbzmeodutbrxd.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_JKRwt7biD2Y9wCQpQC9iQA_-EDPL17V';
+const PUBLIC_ROOM = 'ciudad-abierta-publica';
+const MAX_PLAYERS = 10;
 
 // ELEMENTOS DE LA PÁGINA
 const $ = id => document.getElementById(id);
