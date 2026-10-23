@@ -3,7 +3,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#101820">
   <title>Ciudad Abierta 3D</title>
   <link rel="stylesheet" href="./style.css">
@@ -17,20 +17,12 @@
 
     <form id="joinForm">
       <label for="playerName">Nombre de jugador</label>
-      <input
-        id="playerName"
-        type="text"
-        maxlength="18"
-        placeholder="Escribe tu nombre"
-        autocomplete="nickname"
-        required
-      >
+      <input id="playerName" maxlength="18"
+        placeholder="Escribe tu nombre" autocomplete="nickname" required>
       <button id="playButton" type="submit">ENTRAR A LA CIUDAD</button>
     </form>
 
-    <p id="menuStatus" class="status" role="status">
-      Escribe tu nombre para comenzar.
-    </p>
+    <p id="menuStatus" class="status">Escribe tu nombre para comenzar.</p>
 
     <div class="menu-footer">
       <span>● SALA PÚBLICA</span>
@@ -42,7 +34,7 @@
     <header id="hud">
       <div class="brand">
         <strong>CIUDAD <span>ABIERTA 3D</span></strong>
-        <small>Sala pública · <b id="playerCount">1</b>/10 jugadores</small>
+        <small>Sala pública: <b id="playerCount">1</b>/10</small>
       </div>
 
       <div class="stats">
@@ -59,15 +51,18 @@
       <button id="leaveButton" class="leave-button" type="button">SALIR</button>
     </header>
 
-    <div id="crosshair" aria-hidden="true">+</div>
+    <div id="crosshair">+</div>
 
     <aside id="help">
       <strong>CONTROLES</strong>
       <p>W A S D — Moverte</p>
       <p>SHIFT — Correr</p>
+      <p>SHIFT + C — Deslizarte</p>
+      <p>CTRL — Agacharte</p>
       <p>RATÓN — Mirar</p>
-      <p>CLIC — Disparar</p>
+      <p>CLIC IZQUIERDO — Disparar</p>
       <p>ESPACIO — Saltar</p>
+      <p>E — Mantener para revivir</p>
       <p>ESC — Liberar ratón</p>
     </aside>
 
