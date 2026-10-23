@@ -4,51 +4,82 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Ciudad Abierta 3D Multijugador</title>
-  <link rel="stylesheet" href="style.css">
+  <meta name="theme-color" content="#101820">
+  <title>Ciudad Abierta 3D | Multijugador</title>
+  <link rel="stylesheet" href="./style.css">
 </head>
 <body>
-  <div id="menu" class="panel">
+  <main id="menu" class="panel">
+    <div class="logo">CA<span>3D</span></div>
     <h1>CIUDAD ABIERTA 3D</h1>
-    <p>Multijugador en línea</p>
+    <p class="subtitle">Explora la ciudad con tus amigos</p>
 
-    <label for="playerName">Tu nombre</label>
-    <input id="playerName" maxlength="18" placeholder="Escribe tu nombre">
+    <form id="joinForm">
+      <label for="playerName">Nombre del jugador</label>
+      <input
+        id="playerName"
+        type="text"
+        maxlength="18"
+        placeholder="Tu nombre"
+        autocomplete="nickname"
+        required
+      >
 
-    <label for="roomCode">Código de sala</label>
-    <input id="roomCode" maxlength="20" placeholder="Ejemplo: AMIGOS123">
+      <label for="roomCode">Código de la sala</label>
+      <input
+        id="roomCode"
+        type="text"
+        maxlength="20"
+        placeholder="Ejemplo: AMIGOS123"
+        autocomplete="off"
+      >
 
-    <button id="joinButton">Entrar a la ciudad</button>
-    <button id="newRoomButton" class="secondary">Crear sala nueva</button>
+      <button id="joinButton" type="submit">
+        Entrar a la ciudad
+      </button>
 
-    <p id="menuStatus">Introduce un nombre y un código para jugar con amigos.</p>
-    <p class="small">
-      Se necesita configurar Supabase para activar el multijugador.
+      <button id="newRoomButton" type="button" class="secondary">
+        Crear una sala nueva
+      </button>
+    </form>
+
+    <p id="menuStatus" class="status" role="status">
+      Escribe tu nombre para comenzar.
     </p>
-  </div>
 
-  <div id="game" hidden>
+    <p class="small">
+      Multijugador para hasta 10 participantes por sala.
+    </p>
+  </main>
+
+  <main id="game" hidden>
     <div id="hud">
-      <div>
-        <strong>CIUDAD ABIERTA 3D</strong>
-        <div>Sala: <span id="currentRoom">---</span></div>
-        <div>Jugadores: <span id="playerCount">1</span>/10</div>
+      <div class="hud-brand">
+        <strong>CIUDAD ABIERTA <span>3D</span></strong>
+        <small>Sala: <b id="currentRoom">---</b></small>
+        <small>Jugadores: <b id="playerCount">1</b>/10</small>
       </div>
-      <button id="copyRoomButton">Copiar invitación</button>
-      <button id="leaveButton">Salir</button>
+
+      <button id="copyRoomButton" class="small-button">
+        Invitar amigos
+      </button>
+
+      <button id="leaveButton" class="danger small-button">
+        Salir
+      </button>
     </div>
 
     <div id="help">
-      <b>Controles</b><br>
-      W A S D — Moverse<br>
-      Flechas — Moverse<br>
-      Shift — Correr<br>
-      Ratón — Girar cámara
+      <strong>CONTROLES</strong>
+      <p>W A S D — Moverse</p>
+      <p>Shift — Correr</p>
+      <p>Ratón — Girar cámara</p>
+      <p>Esc — Liberar ratón</p>
     </div>
 
-    <div id="notice"></div>
-  </div>
+    <div id="notice" role="status"></div>
+  </main>
 
-  <script type="module" src="game.js"></script>
+  <script type="module" src="./game.js"></script>
 </body>
 </html>
